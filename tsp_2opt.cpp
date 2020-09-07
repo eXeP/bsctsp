@@ -1,34 +1,20 @@
 #include <bits/stdc++.h>
 
 struct Graph {
-    int nodes;
-    std::vector<std::vector<std::pair<int, float>>> edges;
+    int dimension;
+    std::vector<std::array<int, 2>> coordinates;
+
+    Graph (int dimension): dimension(dimension), coordinates(std::vector<std::array<int, 2>>(dimension+1)) {}
     
-
-    Graph (int n): nodes(n), edges(std::vector<std::vector<std::pair<int, float>>>(n)){}
-
-    void add_edge(int i, int j, float w) {
-        edges[i].push_back({j, w});
-    }
-
-    std::vector<std::vector<float>> w;
-    void floyd_warshall() {
-        w = std::vector<std::vector<float>>(nodes, std::vector<float>(nodes, std::numeric_limits<float>::max()/10.0));
-        for (int i = 0; i < nodes; ++i)
-            for (auto& f: edges[i]) 
-                w[i][f.first] = std::min(w[i][f.first], f.second);
-        for (int i = 0; i < nodes; ++i) {
-            for (int j = 0; j < nodes; ++j) {
-                for (int k = 0; k < nodes; ++k) {
-                    w[i][j] = std::min(w[i][j], w[i][k]+w[k][j]);
-                }
-            }
-        } 
+    void add_node(int i, int x, int y) {
+        coordinates[i] = {x, y};
     }
 
     float dist(int i, int j) {
-        return w[i][j];
-    }
+        return 
+        std::sqrt(((float) coordinates[i][0]-coordinates[j][0])*((float) coordinates[i][0]-coordinates[j][0])
+        +((float) coordinates[i][1]-coordinates[j][1])*((float) coordinates[i][1]-coordinates[j][1]));
+    } 
 };
 
 struct TSP_Solution {
@@ -41,27 +27,29 @@ float rand01(){
     return ((float) rand() / (RAND_MAX));
 }
 
-Graph random_graph(int n) {
-    Graph g = Graph(n);
-    for (int i = 0; i < n; ++i) {
-        float len = rand01();
-        g.add_edge(i, (i+1)%n, len);
-        g.add_edge((i+1)%n, i, len);
-        for (int j = 0; j < 7; ++j) {
-            len = rand01();
-            int rand_node = rand()%g.nodes;
-            g.add_edge(i, rand_node, len);
-            g.add_edge(rand_node, i, len);
-        }
+Graph read_graph() {
+    std::string sink;
+    int dimension;
+    std::getline(std::cin, sink);
+    std::getline(std::cin, sink);
+    std::getline(std::cin, sink);
+    std::cin >> sink >> dimension;
+    std::getline(std::cin, sink);
+    std::getline(std::cin, sink);
+
+    Graph g = Graph(dimension);
+    for (int i = 0; i < dimension; ++i) {
+        int id, x, y;
+        std::cin >> id >> x >> y;
+        g.add_node(id, x, y);
     }
-    g.floyd_warshall();
     return g;
 }
 
 float calculate_dist(Graph& g, std::vector<int>& path) {
     float dist = 0.0f;
-    for(int i = 0; i < g.nodes; ++i)
-        dist += g.dist(path[i], path[(i+1)%g.nodes]);
+    for(int i = 0; i < g.dimension; ++i)
+        dist += g.dist(path[i], path[(i+1)%g.dimension]);
     return dist;
 }
 
@@ -71,18 +59,18 @@ std::vector<int> two_opt_swap(std::vector<int> route, int i, int k) {
 }
 
 void tsp_2opt(Graph& g) {
-    std::vector<int> perm = std::vector<int>(g.nodes);
-    for (int i = 0; i < g.nodes; ++i)
+    std::vector<int> perm = std::vector<int>(g.dimension);
+    for (int i = 0; i < g.dimension; ++i)
         perm[i] = i;
     TSP_Solution best = TSP_Solution(calculate_dist(g, perm), perm);
-    for (int n_shuffles = 0; n_shuffles < 2000; ++n_shuffles) {
+    for (int n_shuffles = 0; n_shuffles < 80; ++n_shuffles) {
         std::random_shuffle(perm.begin(), perm.end());
         TSP_Solution best_local = TSP_Solution(calculate_dist(g, perm), perm);
         float better = false;
         do {
             better = false;
-            for (int i = 1; i < g.nodes-1; ++i) {
-                for (int k = i+1; k < g.nodes; ++k) {
+            for (int i = 1; i < g.dimension-1; ++i) {
+                for (int k = i+1; k < g.dimension; ++k) {
                     auto new_route = two_opt_swap(perm, i, k);
                     float new_route_cost = calculate_dist(g, new_route);
                     if (new_route_cost < best_local.cost) {
@@ -100,20 +88,20 @@ void tsp_2opt(Graph& g) {
 }
 
 void prim_1tree(Graph& g) {
-    std::vector<bool> picked = std::vector<bool>(g.nodes, false);
-    std::vector<std::pair<float, int>> value = std::vector<std::pair<float, int>>(g.nodes, {std::numeric_limits<float>::max()/10.0, -1});
+    std::vector<bool> picked = std::vector<bool>(g.dimension, false);
+    std::vector<std::pair<float, int>> value = std::vector<std::pair<float, int>>(g.dimension, {std::numeric_limits<float>::max()/10.0, -1});
     value[1] = {0, 1};
     std::set<std::pair<float, int>> pq;
     pq.insert({0, 1});
-    Graph onetree = Graph(g.nodes);
-    onetree.nodes = g.nodes;
+    Graph onetree = Graph(g.dimension);
+    onetree.dimension = g.dimension;
     while (!pq.empty()) {
         auto current = *pq.begin();
         pq.erase(pq.begin());
         if (picked[current.second]) {
             continue;
         }
-        onetree.add_edge(current.second, value[current.second].second, value[current.second].first-value[value[current.second].second].first);
+        /*onetree.add_edge(current.second, value[current.second].second, value[current.second].first-value[value[current.second].second].first);
         onetree.add_edge(value[current.second].second, current.second, value[current.second].first-value[value[current.second].second].first);
         picked[current.second] = true;
         for (auto& f: g.edges[current.second]) {
@@ -123,19 +111,22 @@ void prim_1tree(Graph& g) {
                 value[f.second] = {current.first+f.first, current.second};
             }
         }
+        */
     }
+    /*
     std::sort(g.edges[0].begin(), g.edges[0].end());
     onetree.add_edge(0, g.edges[0][0].second, g.edges[0][0].first);
     onetree.add_edge(g.edges[0][0].second, 0, g.edges[0][0].first);
     onetree.add_edge(0, g.edges[0][1].second, g.edges[0][1].first);
     onetree.add_edge(g.edges[0][1].second, 0, g.edges[0][1].first);
+    */
 }
 
 
 
 void tsp_naive(Graph& g) {
-    std::vector<int> perm = std::vector<int>(g.nodes);
-    for (int i = 0; i < g.nodes; ++i)
+    std::vector<int> perm = std::vector<int>(g.dimension);
+    for (int i = 0; i < g.dimension; ++i)
         perm[i] = i;
     TSP_Solution best = TSP_Solution(calculate_dist(g, perm), perm);
     while (std::next_permutation(perm.begin(), perm.end())) {
@@ -148,7 +139,7 @@ void tsp_naive(Graph& g) {
 }
 
 int main() {
-    Graph graph = random_graph(11);
+    Graph graph = read_graph();
     tsp_2opt(graph);
-    tsp_naive(graph);
+    //tsp_naive(graph);
 }
