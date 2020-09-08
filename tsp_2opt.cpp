@@ -80,88 +80,69 @@ float read_optimal(Graph& g, char* tsp_name) {
 struct Tour {
     int dimension;
     float length = 0.0f;
-    std::vector<std::array<int, 2>> edges;
-    Tour (int dimension): dimension(dimension), edges(std::vector<std::array<int, 2>>(dimension+1, {0, 0})){}
-    void remove_edge(int i, int j, Graph& g) {
-        #pragma unroll
-        for (int k = 0; k < 2; ++k) {
-            if (edges[i][k] == j)
-                edges[i][k] = 0;
-            if (edges[j][k] == i)
-                edges[j][k] = 0;
-        }
-        length -= g.dist(i, j);
-    }
-    void add_edge(int i, int j, Graph& g) {
-        for (int k = 0; k < 2; ++k) {
-            if (edges[i][k] == 0) {
-                edges[i][k] = j;
-                break;
-            }
-        }
-        for (int k = 0; k < 2; ++k) {
-            if (edges[j][k] == 0) {
-                edges[j][k] = i;
-                break;
-            }
-        }
-        length += g.dist(i, j);
-    }
+    std::vector<int> tour;
+    Tour (int dimension): dimension(dimension), tour(std::vector<int>(dimension)){}
+    
 };
 
 void shuffle_tour(Graph& g, Tour& t) {
     for (int swaps = 0; swaps < g.dimension/3; ++swaps) {
-        int a = rand()%g.dimension+1, b = rand()%g.dimension+1;
-        auto an = t.edges[a], bn = t.edges[b];
+        int a = rand()%g.dimension, b = rand()%g.dimension;
+        auto an = {t.tour[(a-1+t.dimension)%t.dimension], t.tour[(a+1+t.dimension)%t.dimension]}, 
+        bn = {t.tour[(b-1+t.dimension)%t.dimension], t.tour[(b+1+t.dimension)%t.dimension]};
         for (auto f : an) {
-            t.remove_edge(a, f, g);
+            t.length -= g.dist(a, f);
         }
         for (auto f : bn) {
-            t.remove_edge(b, f, g);
+            t.length -= g.dist(b, f);
         }
         for (auto f : an) {
-            t.add_edge(b, f, g);
+            t.length += g.dist(b, f);
         }
         for (auto f : bn) {
-            t.add_edge(a, f, g);
+            t.length += g.dist(a, f);
         }
     }
 }
 
+void swap_2opt(Tour& t, int i, int j) {
+    std::reverse(t.tour.begin()+i, t.tour.begin()+j+1);
+}
 
 void tsp_2opt(Graph& g) {
     Tour tour = Tour(g.dimension);
-    for (int i = 1; i <= g.dimension; ++i)
-        tour.add_edge(i, (i+1)%g.dimension+1, g);
+    for (int i = 1; i <= g.dimension; ++i) {
+        tour.tour[i-1] = i;
+    }
+    tour.length = calculate_dist(g, tour.tour);
     Tour best = tour;
-    for (int n_shuffles = 0; n_shuffles < 1; ++n_shuffles) {
+    for (int n_shuffles = 0; n_shuffles < 10; ++n_shuffles) {
         Tour best_local = tour;
         shuffle_tour(g, best_local);
         float better = false;
         do {
             better = false;
             std::pair<int, int> best_ij;
-            float ij_impr = 9999999999.0f;
-            for (int i = 2; i < g.dimension-2; ++i) {
+            float best_impr = 0.0f;
+            for (int i = 1; i < g.dimension-2; ++i) {
                 for (int j = i+1; j < g.dimension-1; ++j) {
-                    if (g.dist(i, i-1) + g.dist(j+1, j) > g.dist(i, j+1) + g.dist(i-1, j)) {
+                    float impr = g.dist(best_local.tour[i], best_local.tour[i-1]) + g.dist(best_local.tour[j+1], best_local.tour[j]) - 
+                    (g.dist(best_local.tour[i], best_local.tour[j+1]) + g.dist(best_local.tour[i-1], best_local.tour[j]));
+                    if (impr > 0.0f) {
                         better = true;
-                        if (g.dist(i, j+1) + g.dist(i-1, j) < ij_impr) {
+                        if (impr > best_impr) {
                             best_ij = {i, j};
-                            ij_impr = g.dist(i, j+1) + g.dist(i-1, j);
+                            best_impr = impr;
                         }
                     }
                     
                 }
             }
             if (better) {
-                std::cout << "Parempi " << best_ij.first << " " << best_ij.second << std::endl;
-                best_local.remove_edge(best_ij.first, best_ij.first-1, g);
-                best_local.remove_edge(best_ij.second, best_ij.second+1, g);
-                best_local.add_edge(best_ij.first, best_ij.second+1, g);
-                best_local.add_edge(best_ij.first-1, best_ij.second, g);
+                swap_2opt(best_local, best_ij.first, best_ij.second);
+                best_local.length -= best_impr;
             }
-            //std::cout << "Paras: " << best_local.length << std::endl;
+            
         } while (better);
         if (best_local.length < best.length) {
             best = best_local;
