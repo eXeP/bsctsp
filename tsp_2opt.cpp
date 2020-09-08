@@ -27,20 +27,23 @@ float rand01(){
     return ((float) rand() / (RAND_MAX));
 }
 
-Graph read_graph() {
+Graph read_graph(char* tsp_name) {
+    std::string tsp_file_name = "tsplib/" + std::string(tsp_name) + ".tsp";
+    std::ifstream tsp_file(tsp_file_name);
     std::string sink;
     int dimension;
-    std::getline(std::cin, sink);
-    std::getline(std::cin, sink);
-    std::getline(std::cin, sink);
-    std::cin >> sink >> dimension;
-    std::getline(std::cin, sink);
-    std::getline(std::cin, sink);
+    std::getline(tsp_file, sink);
+    std::getline(tsp_file, sink);
+    std::getline(tsp_file, sink);
+    tsp_file >> sink >> dimension;
+    std::getline(tsp_file, sink);
+    std::getline(tsp_file, sink);
+    std::getline(tsp_file, sink);
 
     Graph g = Graph(dimension);
     for (int i = 0; i < dimension; ++i) {
         int id, x, y;
-        std::cin >> id >> x >> y;
+        tsp_file >> id >> x >> y;
         g.add_node(id, x, y);
     }
     return g;
@@ -53,38 +56,118 @@ float calculate_dist(Graph& g, std::vector<int>& path) {
     return dist;
 }
 
-std::vector<int> two_opt_swap(std::vector<int> route, int i, int k) {
-    std::reverse(route.begin()+i, route.begin()+k+1);
-    return route;
+float read_optimal(Graph& g, char* tsp_name) {
+    std::ifstream tsp_file("tsplib/" + std::string(tsp_name) + ".opt.tour");
+    std::string sink;
+    std::getline(tsp_file, sink);
+    std::getline(tsp_file, sink);
+    std::getline(tsp_file, sink);
+    std::getline(tsp_file, sink);
+    int node;
+    tsp_file >> node;
+    std::vector<int> tour;
+    do {
+        tour.push_back(node);
+        tsp_file >> node;
+    } while (node != -1);
+    return calculate_dist(g, tour);
 }
 
+
+
+
+
+struct Tour {
+    int dimension;
+    float length = 0.0f;
+    std::vector<std::array<int, 2>> edges;
+    Tour (int dimension): dimension(dimension), edges(std::vector<std::array<int, 2>>(dimension+1, {0, 0})){}
+    void remove_edge(int i, int j, Graph& g) {
+        #pragma unroll
+        for (int k = 0; k < 2; ++k) {
+            if (edges[i][k] == j)
+                edges[i][k] = 0;
+            if (edges[j][k] == i)
+                edges[j][k] = 0;
+        }
+        length -= g.dist(i, j);
+    }
+    void add_edge(int i, int j, Graph& g) {
+        for (int k = 0; k < 2; ++k) {
+            if (edges[i][k] == 0) {
+                edges[i][k] = j;
+                break;
+            }
+        }
+        for (int k = 0; k < 2; ++k) {
+            if (edges[j][k] == 0) {
+                edges[j][k] = i;
+                break;
+            }
+        }
+        length += g.dist(i, j);
+    }
+};
+
+void shuffle_tour(Graph& g, Tour& t) {
+    for (int swaps = 0; swaps < g.dimension/3; ++swaps) {
+        int a = rand()%g.dimension+1, b = rand()%g.dimension+1;
+        auto an = t.edges[a], bn = t.edges[b];
+        for (auto f : an) {
+            t.remove_edge(a, f, g);
+        }
+        for (auto f : bn) {
+            t.remove_edge(b, f, g);
+        }
+        for (auto f : an) {
+            t.add_edge(b, f, g);
+        }
+        for (auto f : bn) {
+            t.add_edge(a, f, g);
+        }
+    }
+}
+
+
 void tsp_2opt(Graph& g) {
-    std::vector<int> perm = std::vector<int>(g.dimension);
-    for (int i = 0; i < g.dimension; ++i)
-        perm[i] = i;
-    TSP_Solution best = TSP_Solution(calculate_dist(g, perm), perm);
-    for (int n_shuffles = 0; n_shuffles < 80; ++n_shuffles) {
-        std::random_shuffle(perm.begin(), perm.end());
-        TSP_Solution best_local = TSP_Solution(calculate_dist(g, perm), perm);
+    Tour tour = Tour(g.dimension);
+    for (int i = 1; i <= g.dimension; ++i)
+        tour.add_edge(i, (i+1)%g.dimension+1, g);
+    Tour best = tour;
+    for (int n_shuffles = 0; n_shuffles < 1; ++n_shuffles) {
+        Tour best_local = tour;
+        shuffle_tour(g, best_local);
         float better = false;
         do {
             better = false;
-            for (int i = 1; i < g.dimension-1; ++i) {
-                for (int k = i+1; k < g.dimension; ++k) {
-                    auto new_route = two_opt_swap(perm, i, k);
-                    float new_route_cost = calculate_dist(g, new_route);
-                    if (new_route_cost < best_local.cost) {
-                        best_local = TSP_Solution(new_route_cost, new_route);
+            std::pair<int, int> best_ij;
+            float ij_impr = 9999999999.0f;
+            for (int i = 2; i < g.dimension-2; ++i) {
+                for (int j = i+1; j < g.dimension-1; ++j) {
+                    if (g.dist(i, i-1) + g.dist(j+1, j) > g.dist(i, j+1) + g.dist(i-1, j)) {
                         better = true;
+                        if (g.dist(i, j+1) + g.dist(i-1, j) < ij_impr) {
+                            best_ij = {i, j};
+                            ij_impr = g.dist(i, j+1) + g.dist(i-1, j);
+                        }
                     }
+                    
                 }
             }
+            if (better) {
+                std::cout << "Parempi " << best_ij.first << " " << best_ij.second << std::endl;
+                best_local.remove_edge(best_ij.first, best_ij.first-1, g);
+                best_local.remove_edge(best_ij.second, best_ij.second+1, g);
+                best_local.add_edge(best_ij.first, best_ij.second+1, g);
+                best_local.add_edge(best_ij.first-1, best_ij.second, g);
+            }
+            //std::cout << "Paras: " << best_local.length << std::endl;
         } while (better);
-        if (best_local.cost < best.cost) {
+        if (best_local.length < best.length) {
             best = best_local;
         }
     }
-    std::cout << "Smallest route: " << best.cost << std::endl;
+    std::cout << "Smallest route: " << best.length << std::endl;
 }
 
 void prim_1tree(Graph& g) {
@@ -138,8 +221,9 @@ void tsp_naive(Graph& g) {
     std::cout << "Real best: " << best.cost << std::endl;
 }
 
-int main() {
-    Graph graph = read_graph();
+int main(int argc, char** argv) {
+    Graph graph = read_graph(argv[1]);
     tsp_2opt(graph);
+    std::cout << "Best: " << read_optimal(graph, argv[1]) << std::endl;
     //tsp_naive(graph);
 }
