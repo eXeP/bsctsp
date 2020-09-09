@@ -88,20 +88,27 @@ struct Tour {
 void shuffle_tour(Graph& g, Tour& t) {
     for (int swaps = 0; swaps < g.dimension/3; ++swaps) {
         int a = rand()%g.dimension, b = rand()%g.dimension;
+        if (a == ((b-1+t.dimension)%t.dimension) || a == ((b+1+t.dimension)%t.dimension) || a == b) {
+            continue;
+        }
+        int ai = t.tour[a], bi = t.tour[b];
         auto an = {t.tour[(a-1+t.dimension)%t.dimension], t.tour[(a+1+t.dimension)%t.dimension]}, 
         bn = {t.tour[(b-1+t.dimension)%t.dimension], t.tour[(b+1+t.dimension)%t.dimension]};
+        
         for (auto f : an) {
-            t.length -= g.dist(a, f);
+            t.length -= g.dist(ai, f);
         }
         for (auto f : bn) {
-            t.length -= g.dist(b, f);
+            t.length -= g.dist(bi, f);
         }
         for (auto f : an) {
-            t.length += g.dist(b, f);
+            t.length += g.dist(bi, f);
         }
         for (auto f : bn) {
-            t.length += g.dist(a, f);
+            t.length += g.dist(ai, f);
         }
+        t.tour[a] = bi;
+        t.tour[b] = ai;
     }
 }
 
@@ -116,10 +123,13 @@ void tsp_2opt(Graph& g) {
     }
     tour.length = calculate_dist(g, tour.tour);
     Tour best = tour;
-    for (int n_shuffles = 0; n_shuffles < 10; ++n_shuffles) {
+    const int SHUFFLES = 100;
+    double tsum = 0, lsum = 0;
+    for (int n_shuffles = 0; n_shuffles < SHUFFLES; ++n_shuffles) {
         Tour best_local = tour;
         shuffle_tour(g, best_local);
         float better = false;
+        auto start = std::chrono::system_clock::now();
         do {
             better = false;
             std::pair<int, int> best_ij;
@@ -144,10 +154,66 @@ void tsp_2opt(Graph& g) {
             }
             
         } while (better);
+        auto end = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_seconds = end-start;
+        //std::cout << "No break " << best_local.length << " elapsed time:  " << elapsed_seconds.count() << "s\n";
+        lsum+=best_local.length;
+        tsum+=elapsed_seconds.count();
         if (best_local.length < best.length) {
             best = best_local;
         }
     }
+    std::cout << "No break Time " << tsum/SHUFFLES << " len " << lsum/SHUFFLES << std::endl;
+    std::cout << "Smallest route: " << best.length << std::endl;
+}
+
+void tsp_2opt_break(Graph& g) {
+    Tour tour = Tour(g.dimension);
+    for (int i = 1; i <= g.dimension; ++i) {
+        tour.tour[i-1] = i;
+    }
+    tour.length = calculate_dist(g, tour.tour);
+    Tour best = tour;
+    const int SHUFFLES = 100;
+    double tsum = 0, lsum = 0;
+    for (int n_shuffles = 0; n_shuffles < SHUFFLES; ++n_shuffles) {
+        Tour best_local = tour;
+        shuffle_tour(g, best_local);
+        float better = false;
+        auto start = std::chrono::system_clock::now();
+        do {
+            better = false;
+            std::pair<int, int> best_ij;
+            float best_impr = 0.0f;
+            for (int i = 1; i < g.dimension-2; ++i) {
+                for (int j = i+1; j < g.dimension-1; ++j) {
+                    float impr = g.dist(best_local.tour[i], best_local.tour[i-1]) + g.dist(best_local.tour[j+1], best_local.tour[j]) - 
+                    (g.dist(best_local.tour[i], best_local.tour[j+1]) + g.dist(best_local.tour[i-1], best_local.tour[j]));
+                    if (impr > 0.0f) {
+                        better = true;
+                        best_ij = {i, j};
+                        best_impr = impr;
+                        break;
+                    }
+                    
+                }
+            }
+            if (better) {
+                swap_2opt(best_local, best_ij.first, best_ij.second);
+                best_local.length -= best_impr;
+            }
+            
+        } while (better);
+        auto end = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_seconds = end-start;
+        //std::cout << "With Break: " << best_local.length << " elapsed time: " << elapsed_seconds.count() << "s\n";
+        lsum+=best_local.length;
+        tsum+=elapsed_seconds.count();
+        if (best_local.length < best.length) {
+            best = best_local;
+        }
+    }
+    std::cout << "Break Time " << tsum/SHUFFLES << " len " << lsum/SHUFFLES << std::endl;
     std::cout << "Smallest route: " << best.length << std::endl;
 }
 
@@ -203,8 +269,10 @@ void tsp_naive(Graph& g) {
 }
 
 int main(int argc, char** argv) {
+    std::srand(std::time(nullptr));
     Graph graph = read_graph(argv[1]);
     tsp_2opt(graph);
+    tsp_2opt_break(graph);
     std::cout << "Best: " << read_optimal(graph, argv[1]) << std::endl;
     //tsp_naive(graph);
 }
