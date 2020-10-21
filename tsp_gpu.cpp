@@ -202,135 +202,51 @@ void tsp_2opt(TSP_Graph& g) {
     std::cout << "Smallest route: " << best.length << std::endl;
 }
 
-
-Graph prim_1tree(TSP_Graph& g) {
-    std::vector<bool> picked = std::vector<bool>(g.dimension+1, false);
-    std::vector<std::pair<float, int>> value = std::vector<std::pair<float, int>>(g.dimension+1, {std::numeric_limits<float>::max(), -1});
-    value[2] = {0, 2};
-    std::set<std::pair<float, int>> pq;
-    pq.insert({0, 2});
-    Graph onetree = Graph(g.dimension);
-    while (!pq.empty()) {
-        auto current = *pq.begin();
-        pq.erase(pq.begin());
-        if (picked[current.second]) {
-            continue;
-        }
-        onetree.topo.push_back(current.second);
-        onetree.add_edge(current.second, value[current.second].second, value[current.second].first-value[value[current.second].second].first);
-        onetree.add_edge(value[current.second].second, current.second, value[current.second].first-value[value[current.second].second].first);
-        picked[current.second] = true;
-        for (int i = 2; i <= g.dimension; ++i) {
-            if (i == current.second || picked[i])
-                continue;
-            float new_len = g.dist(i, current.second);
-            if (current.first+new_len < value[i].first) {
-                auto old = pq.find({value[i].first, i});
-                if (old != pq.end())
-                    pq.erase(old);
-                pq.insert({current.first+new_len, i});
-                value[i] = {current.first+new_len, current.second};
-                onetree.dad[i] = current.second;
+std::pair<int, int> two_opt_best(std::vector<int>& x, std::vector<int>& y) {
+    int n = x.size();
+    int best = 0, best_i = 0, best_j = 0;
+    auto dist = [&x, &y](int i, int j) {
+        int d1 = (x[i]-x[i-1])*(x[i]-x[i-1]) + (y[i]-y[i-1])*(y[i]-y[i-1]);
+        int d2 = (x[j]-x[j+1])*(x[j]-x[j+1]) + (y[j]-y[j+1])*(y[j]-y[j+1]);
+        int d3 = (x[i]-x[j+1])*(x[i]-x[j+1]) + (y[i]-y[j+1])*(y[i]-y[j+1]);
+        int d4 = (x[j]-x[i-1])*(x[j]-x[i-1]) + (y[j]-y[i-1])*(y[j]-y[i-1]);
+        return d1+d2-(d3+d4);
+    };
+    for (int i = 1; i < n-2; ++i) {
+        for (int j = i+1; j < n-1; ++j) {
+            int new_impr = dist(i, j);
+            if (new_impr > best) {
+                best = new_impr;
+                best_i = i;
+                best_j = j;
             }
         }
     }
-
-    std::vector<std::pair<float, int>> edges1;
-    for (int i = 2; i <= g.dimension; ++i)
-        edges1.push_back({g.dist(1, i), i});
-    std::sort(edges1.begin(), edges1.end());
-    onetree.add_edge(1, edges1[0].first, edges1[0].second);
-    onetree.add_edge(edges1[0].first, 1, edges1[0].second);
-    onetree.add_edge(1, edges1[1].first, edges1[1].second);
-    onetree.add_edge(edges1[1].first, 1, edges1[1].second);
-    
-    return onetree;
+    auto dist2 = [&x, &y](int i, int j) {
+        int d1 = (x[i]-x[i-1])*(x[i]-x[i-1]) + (y[i]-y[i-1])*(y[i]-y[i-1]);
+        int d2 = (x[j]-x[j+1])*(x[j]-x[j+1]) + (y[j]-y[j+1])*(y[j]-y[j+1]);
+        int d3 = (x[i]-x[j+1])*(x[i]-x[j+1]) + (y[i]-y[j+1])*(y[i]-y[j+1]);
+        int d4 = (x[j]-x[i-1])*(x[j]-x[i-1]) + (y[j]-y[i-1])*(y[j]-y[i-1]);
+        std::cout << d1 << " " << d2 << " " << d3 << " " << d4 << std::endl;
+        return d1+d2-(d3+d4);
+    };
+    dist2(best_i, best_j);
+    std::cout << "CPU paras " << best << " " << best_i << " " << best_j << " " << x[best_i] << " " << x[best_j] << std::endl;
+    return {best_i, best_j};
 }
-
-std::vector<std::vector<float>> calculate_alpha(TSP_Graph& g, Graph one_tree) {
-    float LT = 0.0f;
-    for (int i = 1; i <= g.dimension; ++i) {
-        for (auto f: one_tree.edges[i]) {
-            LT += f.second;
-        }
-    }
-    LT /= 2.0f;
-    std::vector<std::vector<float>> alpha = std::vector<std::vector<float>>(g.dimension+1, std::vector<float>(g.dimension+1, 0));
-    for (int i = 1; i <= g.dimension; ++i) {
-        for (int j = i; j <= g.dimension; ++j) {
-            if (i == j) 
-                alpha[i][j] = std::numeric_limits<float>::max();
-            //Case (a) in paper
-            for (auto f : one_tree.edges[i]) {
-                if (f.first == j) {
-                    alpha[i][j] = 0.0f;
-                    goto next_j;
-                }
-            }
-            //Case (b) in paper
-            if (i == 1 || j == 1) {
-                float one_max_edge = 0.0f;
-                for (auto f : one_tree.edges[1])
-                    one_max_edge = std::max(one_max_edge, f.second);
-                alpha[i][j] = g.dist(i, j) - one_max_edge;
-                goto next_j;
-            }
-        }
-        next_j:
-        1==1;
-    }
-    std::vector<int> mark = std::vector<int>(g.dimension+1);
-    std::vector<float> b = std::vector<float>(g.dimension+1);
-    for (int i = 2; i <= g.dimension; ++i)
-        mark[i] = 0;
-    for (int i = 2; i <= g.dimension; ++i) {
-        int node_id = one_tree.topo[i-2];
-        b[node_id] = 0;
-        int j = 0;
-        for (int k = node_id; k != 2; k = j) {
-            j = one_tree.dad[k];
-            b[j] = std::max(b[k], g.dist(k, j));
-            mark[j] = node_id;
-        }
-        for (j = 2; j <= g.dimension; ++j) {
-            if (j != node_id) {
-                if (mark[j] != node_id) {
-                    b[j] = std::max(b[one_tree.dad[j]], g.dist(j, one_tree.dad[j]));
-                    alpha[node_id][j] = g.dist(j, node_id)-b[j];
-                }
-            }
-        }
-    }
-    return alpha;
-}
-
-
-
-void tsp_naive(TSP_Graph& g) {
-    std::vector<int> perm = std::vector<int>(g.dimension);
-    for (int i = 0; i < g.dimension; ++i)
-        perm[i] = i;
-    TSP_Solution best = TSP_Solution(calculate_dist(g, perm), perm);
-    while (std::next_permutation(perm.begin(), perm.end())) {
-        float new_cost = calculate_dist(g, perm);
-        if (new_cost < best.cost) {
-            best = TSP_Solution(new_cost, perm);
-        }
-    }
-    std::cout << "Real best: " << best.cost << std::endl;
-}
-
-
 
 int main(int argc, char** argv) {
-    std::srand(std::time(nullptr));
-    TSP_Graph graph = read_graph(argv[1]);
-    //tsp_2opt(graph);
-    //auto one_tree = prim_1tree(graph);
-    //auto alpha = calculate_alpha(graph, one_tree);
-    float best = read_optimal(graph, argv[1]);
-    std::cout << "Best: " << best << std::endl;
-    run_gpu_2opt(graph.x.data(), graph.y.data(), graph.dimension);
-    
-    //tsp_naive(graph);
+    std::srand(42);
+
+    std::vector<int> x, y;
+    int n = 100;
+    for (int i = 0; i < n; ++i) {
+        x.push_back(rand()%200);
+        y.push_back(rand()%200);
+        std::cout << x[i] << " ";
+    }
+    std::cout << std::endl;
+    two_opt_best(x, y);
+    run_gpu_2opt(x.data(), y.data(), n);
+
 }

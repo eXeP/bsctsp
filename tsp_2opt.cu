@@ -55,9 +55,10 @@ __global__ void two_opt_kernel_slow(const int* x, const int* y, int* best, int* 
 __global__ void two_opt_kernel(const int* x, const int* y, int* return_best, int* return_i, int* return_j, int n) {
     int i = threadIdx.x + blockIdx.x * blockDim.x+1;
     int j = blockIdx.y * blockDim.x;
-    //printf("lol1 %d %d %d\n", threadIdx.x, blockIdx.x, blockIdx.y);
-    if (j+blockDim.x+1 <= i || i >= n-2)
+    printf("lol1 %d %d %d\n", threadIdx.x, blockIdx.x, blockIdx.y);
+    if (j+threadIdx.x >= n)
         return;
+    
     //printf("lol %d %d %d\n", i, j, n);
     __shared__ int shared_x[65];
     __shared__ int shared_y[65];
@@ -66,13 +67,17 @@ __global__ void two_opt_kernel(const int* x, const int* y, int* return_best, int
     shared_best[threadIdx.x] = 0;
     shared_j[threadIdx.x] = 0;
     shared_x[threadIdx.x] = x[j+threadIdx.x];
+    printf("ladataan %d %d %d %d %d %d\n", j+blockDim.x+1, i, n-2, x[j+threadIdx.x], j, j+threadIdx.x);
     shared_y[threadIdx.x] = y[j+threadIdx.x];
     if (threadIdx.x == blockDim.x-1) {
         shared_x[blockDim.x] = x[j+threadIdx.x+1];
         shared_y[blockDim.x] = y[j+threadIdx.x+1];
     }
+    printf("iffi %d %d %d\n", j+blockDim.x+1, i, n-2);
+    if (j+blockDim.x+1 <= i || i >= n-2)
+        return;
     __syncthreads();
-    int best = -1<<30, best_j = 0;
+    int best = 0, best_j = 0;
     if (i > 0) {
         int xi = x[i], xim = x[i-1], yi = y[i], yim = y[i-1];
         int i_dist = dist(xi, yi, xim, yim);
@@ -80,11 +85,20 @@ __global__ void two_opt_kernel(const int* x, const int* y, int* return_best, int
             for (int k = 0; k < blockDim.x; ++k) {
                 if (j+k > i && j+k < n-1) {
                     int k_dist = dist(shared_x[k], shared_y[k], shared_x[k+1], shared_y[k+1]) - 
-                    (dist(xi, xi, shared_x[k+1], shared_y[k+1]) + dist(xim, yim, shared_x[k], shared_y[k]));
+                    (dist(xi, yi, shared_x[k+1], shared_y[k+1]) + dist(xim, yim, shared_x[k], shared_y[k]));
+                    if (k_dist+i_dist == 23444) {
+                        printf("23444 %d %d %d %d\n", i_dist, 
+                        dist(shared_x[k], shared_y[k], shared_x[k+1], shared_y[k+1]), 
+                        dist(xi, xi, shared_x[k+1], shared_y[k+1]),
+                        dist(xim, yim, shared_x[k], shared_y[k])
+                        );
+                    }
                     if (k_dist > best) {
                         best = k_dist;
                         best_j = k;
                     }
+                    if (i == 1)
+                        printf("1 %d %d %d %d\n", j+k, k_dist+i_dist, xi, shared_x[k]);
                 }
             }
         } else {
@@ -99,7 +113,7 @@ __global__ void two_opt_kernel(const int* x, const int* y, int* return_best, int
         }
         best = best + i_dist;
     }
-    
+    printf("parase %d %d %d %d\n", best, i, best_j, blockIdx.x * blockDim.x + blockIdx.y);
     
     shared_best[threadIdx.x] = best;
     shared_j[threadIdx.x] = best_j;
@@ -118,37 +132,43 @@ __global__ void two_opt_kernel(const int* x, const int* y, int* return_best, int
         return_best[blockIdx.x * blockDim.x + blockIdx.y] = best;
         return_i[blockIdx.x * blockDim.x + blockIdx.y] = best_i;
         return_j[blockIdx.x * blockDim.x + blockIdx.y] = best_j;
+        printf("paras2 %d %d %d %d\n", best, best_i, best_j, blockIdx.x * blockDim.x + blockIdx.y);
     }
+    
+}
+
+__global__ void reduce_kernel(int* best, int* best_i, int* best_j, int n) {
+    int local_best = 0, local_best_i = 0, local_best_j = 0;
     __syncthreads();
     if (threadIdx.x == 0 && blockIdx.y == 0) {
         for (int k = 0; k < divupg(n, 64); ++k) {
-            if (return_best[blockIdx.x*blockDim.x + k] > best) {
-                best = return_best[blockIdx.x * blockDim.x + k];
-                best_i = return_i[blockIdx.x * blockDim.x + k];
-                best_j = return_j[blockIdx.x * blockDim.x + k];
+            if (best[blockIdx.x*blockDim.x + k] > local_best) {
+                local_best = best[blockIdx.x * blockDim.x + k];
+                local_best_i = best_i[blockIdx.x * blockDim.x + k];
+                local_best_j = best_j[blockIdx.x * blockDim.x + k];
             }
         }
-        printf("paras %d %d %d %d, %d\n", best, threadIdx.x, blockIdx.x, blockIdx.y, blockIdx.x * blockDim.x);
-        return_best[blockIdx.x * blockDim.x] = best;
-        return_i[blockIdx.x * blockDim.x] = best_i;
-        return_j[blockIdx.x * blockDim.x] = best_j;
+        printf("paras2 %d %d %d\n", local_best, local_best_i, local_best_j);
+        printf("paras %d %d %d %d, %d\n", local_best, threadIdx.x, blockIdx.x, blockIdx.y, blockIdx.x * blockDim.x);
+        best[blockIdx.x * blockDim.x] = local_best;
+        best_i[blockIdx.x * blockDim.x] = local_best_i;
+        best_j[blockIdx.x * blockDim.x] = local_best_j;
     }
     __syncthreads();
     if (threadIdx.x == 0 && blockIdx.y == 0 && blockIdx.x == 0) {
         for (int k = 0; k < divupg(n, 64); ++k) {
-            printf("lol %d %d\n", return_best[k*blockDim.x], k*blockDim.x);
-            if (return_best[k*blockDim.x] > best) {
-                best = return_best[k * blockDim.x];
-                best_i = return_i[k * blockDim.x];
-                best_j = return_j[k * blockDim.x];
+            printf("lol %d %d\n", best[k*blockDim.x], k*blockDim.x);
+            if (best[k*blockDim.x] > local_best) {
+                local_best = best[k * blockDim.x];
+                local_best_i = best_i[k * blockDim.x];
+                local_best_j = best_j[k * blockDim.x];
             }
         }
-        return_best[0] = best;
-        return_i[0] = best_i;
-        return_j[0] = best_j;
+        best[0] = local_best;
+        best_i[0] = local_best_i;
+        best_j[0] = local_best_j;
     }
 }
-
 
 
 __global__ void two_opt_swap_kernel(const int* x, const int* y, int i, int j) {
