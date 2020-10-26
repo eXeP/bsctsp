@@ -105,8 +105,7 @@ __global__ void two_opt_kernel(const int* x, const int* y, int* return_best, int
     int i = threadIdx.x + blockIdx.x * blockDim.x+1;
     int j = blockIdx.y * blockDim.x;
     //printf("lol1 %d %d %d\n", threadIdx.x, blockIdx.x, blockIdx.y);
-    if (j+threadIdx.x >= n)
-        return;
+    
     
     //printf("lol %d %d %d\n", i, j, n);
     __shared__ int shared_x[65];
@@ -115,6 +114,8 @@ __global__ void two_opt_kernel(const int* x, const int* y, int* return_best, int
     __shared__ int shared_j[64];
     shared_best[threadIdx.x] = 0;
     shared_j[threadIdx.x] = 0;
+    if (j+threadIdx.x >= n)
+        return;
     shared_x[threadIdx.x] = x[j+threadIdx.x];
     //printf("ladataan %d %d %d %d %d %d\n", j+blockDim.x+1, i, n-2, x[j+threadIdx.x], j, j+threadIdx.x);
     shared_y[threadIdx.x] = y[j+threadIdx.x];
@@ -133,7 +134,7 @@ __global__ void two_opt_kernel(const int* x, const int* y, int* return_best, int
         if (j <= i || j + blockDim.x >= n) {
             for (int k = 0; k < blockDim.x; ++k) {
                 if (j+k > i && j+k < n-1) {
-                    int k_dist = dist(shared_x[k], shared_y[k], shared_x[k+1], shared_y[k+1]) - 
+                    int k_dist = i_dist + dist(shared_x[k], shared_y[k], shared_x[k+1], shared_y[k+1]) - 
                     (dist(xi, yi, shared_x[k+1], shared_y[k+1]) + dist(xim, yim, shared_x[k], shared_y[k]));
                     if (k_dist > best) {
                         best = k_dist;
@@ -143,7 +144,7 @@ __global__ void two_opt_kernel(const int* x, const int* y, int* return_best, int
             }
         } else {
             for (int k = 0; k < blockDim.x; ++k) {
-                int k_dist = dist(shared_x[k], shared_y[k], shared_x[k+1], shared_y[k+1]) - 
+                int k_dist = i_dist + dist(shared_x[k], shared_y[k], shared_x[k+1], shared_y[k+1]) - 
                 (dist(xi, yi, shared_x[k+1], shared_y[k+1]) + dist(xim, yim, shared_x[k], shared_y[k]));
                 if (k_dist > best) {
                     best = k_dist;
@@ -151,10 +152,9 @@ __global__ void two_opt_kernel(const int* x, const int* y, int* return_best, int
                 }
             }
         }
-        best = best + i_dist;
     }
-    //printf("parase %d %d %d %d\n", best, i, best_j, blockIdx.x * blockDim.x + blockIdx.y);
-    
+    //printf("parase %d %d %d %d\n", best, i, best_j, threadIdx.x);
+    int out_w = divupg(n, 64);
     shared_best[threadIdx.x] = best;
     shared_j[threadIdx.x] = best_j;
     int best_i = i;
@@ -169,15 +169,53 @@ __global__ void two_opt_kernel(const int* x, const int* y, int* return_best, int
                 best_j = shared_j[i2];
             }
         }
-        return_best[blockIdx.x * blockDim.x + blockIdx.y] = best;
-        printf("paras2 %d %d %d %d\n", best, best_i, best_j, blockIdx.x * blockDim.x + blockIdx.y);
+        return_best[3 * (blockIdx.x * out_w + blockIdx.y) + 0] = best;
+        return_best[3 * (blockIdx.x * out_w + blockIdx.y) + 1] = best_i;
+        return_best[3 * (blockIdx.x * out_w + blockIdx.y) + 2] = best_j;
+        //printf("paras2 %d %d %d %d %d\n", best, best_i, best_j, blockIdx.x * out_w + blockIdx.y, out_w);
     }
-    
 }
 
-__global__ void two_opt_swap_kernel(const int* x, const int* y, int i, int j) {
-    printf("lol\n");
+__global__ void two_opt_reduce_kernel(int* best_global, int n) {
+    //printf("%d %d\n", threadIdx.x, blockDim.x);
+    int i = threadIdx.x;
+    int best = 0, best_i, best_j;
+    for (int j = 0; j < n; ++j) {
+        if (best_global[3 * (i * blockDim.x + j)] > best) {
+            best = best_global[3 * (i * blockDim.x  + j)];
+            best_i = best_global[3 * (i * blockDim.x + j) + 1];
+            best_j = best_global[3 * (i * blockDim.x + j) + 2];
+        }
+    }
+    int out_w = blockDim.x;
+    best_global[3 * (i * out_w)] = best;
+    best_global[3 * (i * out_w) + 1] = best_i;
+    best_global[3 * (i * out_w) + 2] = best_j;
+    __syncthreads();
+    if (threadIdx.x == 0) {
+        for (int i2 = 0; i2 < n; ++i2) {
+            if (best_global[3 * (i2 * blockDim.x)] > best) {
+                best = best_global[3 * (i2 * blockDim.x)];
+                best_i = best_global[3 * (i2 * blockDim.x) + 1];
+                best_j = best_global[3 * (i2 * blockDim.x) + 2];
+            }
+        }
+        best_global[0] = best;
+        best_global[1] = best_i;
+        best_global[2] = best_j;
+    }
+}
 
+
+__global__ void two_opt_swap_kernel(int* x, int* y, int i, int j) {
+    int k = threadIdx.x;
+    //printf("swapping %d %d %d %d %d %d\n", i+k, j-k, x[i+k], x[j-k], y[i+k], y[j-k]);
+    int tmp = x[i+k];
+    x[i+k] = x[j-k];
+    x[j-k] = tmp;
+    tmp = y[i+k];
+    y[i+k] = y[j-k];
+    y[j-k] = tmp;
 }
 
 void two_opt_loop(const int* x, const int* y, int n) {
@@ -188,23 +226,30 @@ void two_opt_loop(const int* x, const int* y, int n) {
     cudaMalloc((void**)&yGPU, n * sizeof(int));
     cudaMemcpy(yGPU, y, n * sizeof(int), cudaMemcpyHostToDevice);
     int* bestGPU = NULL;
-    cudaMalloc((void**)&bestGPU, divup(n, 64) * divup(n, 64) * sizeof(int));
+    cudaMalloc((void**)&bestGPU, 3 * divup(n, 64) * divup(n, 64) * sizeof(int));
 
     dim3 dimBlock(64, 1);
     dim3 dimGrid(divup(n, 64), divup(n, 64));
     printf("Block (%d %d), Grid(%d, %d)\n", 61, 1, divup(n, 64), divup(n, 64));
     do {
         two_opt_kernel<<<dimGrid, dimBlock>>>(xGPU, yGPU, bestGPU, n);
-        //two_opt_swap_kernel<<<dimGrid, dimBlock>>>(xGPU, yGPU, 0, 0);
+        CHECK(cudaGetLastError());
+        cudaDeviceSynchronize();
+        two_opt_reduce_kernel<<<dim3(1, 1), dim3(divup(n, 64), 1)>>>(bestGPU, divup(n, 64));
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
         int* best = (int*)malloc(3 * sizeof(int));
         cudaMemcpy(best, bestGPU, 3 * sizeof(int), cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize();
-
-        printf("ohi %d %d %d\n", best[0], best[1], best[2]);
-        break;
-        
+        if (best[0] == 0)
+            break;
+        printf("Improvement %d %d %d\n", best[0], best[1], best[2]);
+        two_opt_swap_kernel<<<dim3(1, 1), dim3((best[2]-best[1]+1)/2, 1)>>>(xGPU, yGPU, best[1], best[2]);
+        CHECK(cudaGetLastError());
+        cudaDeviceSynchronize();
+        cudaMemset(bestGPU, 0, 3 * divup(n, 64) * divup(n, 64) * sizeof(int));
+        //int tmp;
+        //std::cin >> tmp;
     } while(true);
     cudaFree(xGPU);
     cudaFree(yGPU);

@@ -239,7 +239,7 @@ int main(int argc, char** argv) {
     std::srand(42);
 
     std::vector<int> x, y;
-    int n = 100;
+    int n = 1000;
     for (int i = 0; i < n; ++i) {
         x.push_back(rand()%200);
         y.push_back(rand()%200);
