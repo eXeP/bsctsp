@@ -252,14 +252,14 @@ int main(int argc, char** argv) {
     std::srand(42);
 
     std::vector<int> x, y;
-    int n = 10;
+    int n = 670;
     for (int i = 0; i < n; ++i) {
         x.push_back(rand()%200);
         y.push_back(rand()%200);
         std::cout << x[i] << " ";
     }
     std::cout << std::endl;
-    two_opt_best(x, y);
+    //two_opt_best(x, y);
     run_gpu_2opt(x.data(), y.data(), n);
 
 }
