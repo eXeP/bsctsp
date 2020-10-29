@@ -202,9 +202,13 @@ void tsp_2opt(TSP_Graph& g) {
     std::cout << "Smallest route: " << best.length << std::endl;
 }
 
-std::pair<int, int> two_opt_best(std::vector<int>& x, std::vector<int>& y) {
+void swap_2opt_arr(std::vector<int>& t, int i, int j) {
+    std::reverse(t.begin()+i, t.begin()+j+1);
+}
+
+std::pair<int, int> two_opt_best(std::vector<int> x, std::vector<int> y) {
     int n = x.size();
-    int best = 0, best_i = 0, best_j = 0;
+    
     auto dist = [&x, &y](int i, int j) {
         int d1 = (x[i]-x[i-1])*(x[i]-x[i-1]) + (y[i]-y[i-1])*(y[i]-y[i-1]);
         int d2 = (x[j]-x[j+1])*(x[j]-x[j+1]) + (y[j]-y[j+1])*(y[j]-y[j+1]);
@@ -212,15 +216,24 @@ std::pair<int, int> two_opt_best(std::vector<int>& x, std::vector<int>& y) {
         int d4 = (x[j]-x[i-1])*(x[j]-x[i-1]) + (y[j]-y[i-1])*(y[j]-y[i-1]);
         return d1+d2-(d3+d4);
     };
-    for (int i = 1; i < n-2; ++i) {
-        for (int j = i+1; j < n-1; ++j) {
-            int new_impr = dist(i, j);
-            if (new_impr > best) {
-                best = new_impr;
-                best_i = i;
-                best_j = j;
+    int best = 0, best_i = 0, best_j = 0;
+    while (true) {
+        best = 0; best_i = 0; best_j = 0;
+        for (int i = 1; i < n-2; ++i) {
+            for (int j = i+1; j < n-1; ++j) {
+                int new_impr = dist(i, j);
+                if (new_impr > best) {
+                    best = new_impr;
+                    best_i = i;
+                    best_j = j;
+                }
             }
         }
+        std::cout << "CPU paras " << best << " " << best_i << " " << best_j << " " << x[best_i] << " " << x[best_j] << std::endl;
+        if (best == 0)
+            break;
+        swap_2opt_arr(x, best_i, best_j);
+        swap_2opt_arr(y, best_i, best_j);
     }
     auto dist2 = [&x, &y](int i, int j) {
         int d1 = (x[i]-x[i-1])*(x[i]-x[i-1]) + (y[i]-y[i-1])*(y[i]-y[i-1]);
@@ -231,7 +244,7 @@ std::pair<int, int> two_opt_best(std::vector<int>& x, std::vector<int>& y) {
         return d1+d2-(d3+d4);
     };
     dist2(best_i, best_j);
-    std::cout << "CPU paras " << best << " " << best_i << " " << best_j << " " << x[best_i] << " " << x[best_j] << std::endl;
+    std::cout << "ohi" << std::endl;
     return {best_i, best_j};
 }
 
@@ -239,7 +252,7 @@ int main(int argc, char** argv) {
     std::srand(42);
 
     std::vector<int> x, y;
-    int n = 1000;
+    int n = 10;
     for (int i = 0; i < n; ++i) {
         x.push_back(rand()%200);
         y.push_back(rand()%200);
