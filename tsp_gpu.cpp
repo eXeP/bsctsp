@@ -176,15 +176,19 @@ void tsp_2opt(TSP_Graph& g) {
             better = false;
             std::pair<int, int> best_ij;
             float best_impr = 0.0f;
+            #pragma omp parallel for schedule(static,1)
             for (int i = 1; i < g.dimension-2; ++i) {
                 for (int j = i+1; j < g.dimension-1; ++j) {
                     float impr = g.dist(best_local.tour[i], best_local.tour[i-1]) + g.dist(best_local.tour[j+1], best_local.tour[j]) - 
                     (g.dist(best_local.tour[i], best_local.tour[j+1]) + g.dist(best_local.tour[i-1], best_local.tour[j]));
                     if (impr > 0.0f) {
                         better = true;
+                        #pragma omp critical
+                        {
                         if (impr > best_impr) {
                             best_ij = {i, j};
                             best_impr = impr;
+                        }
                         }
                     }
                 }
@@ -234,6 +238,9 @@ std::pair<int, int> two_opt_best(std::vector<int> x, std::vector<int> y) {
             break;
         swap_2opt_arr(x, best_i, best_j);
         swap_2opt_arr(y, best_i, best_j);
+        /*for (auto f: x)
+            std::cout << f << " ";
+        std::cout << std::endl;*/
     }
     auto dist2 = [&x, &y](int i, int j) {
         int d1 = (x[i]-x[i-1])*(x[i]-x[i-1]) + (y[i]-y[i-1])*(y[i]-y[i-1]);
@@ -252,7 +259,7 @@ int main(int argc, char** argv) {
     std::srand(42);
 
     std::vector<int> x, y;
-    int n = 670;
+    int n = std::stoi(argv[1]);
     for (int i = 0; i < n; ++i) {
         x.push_back(rand()%200);
         y.push_back(rand()%200);
