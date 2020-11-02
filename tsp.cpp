@@ -110,97 +110,6 @@ float read_optimal(TSP_Graph& g, char* tsp_name) {
 }
 
 
-
-
-
-struct Tour {
-    int dimension;
-    int length = 0;
-    std::vector<int> tour;
-    Tour (int dimension): dimension(dimension), tour(std::vector<int>(dimension)){}
-    
-};
-
-void shuffle_tour(TSP_Graph& g, Tour& t) {
-    for (int swaps = 0; swaps < g.dimension/3; ++swaps) {
-        int a = rand()%g.dimension, b = rand()%g.dimension;
-        if (a == ((b-1+t.dimension)%t.dimension) || a == ((b+1+t.dimension)%t.dimension) || a == b) {
-            continue;
-        }
-        int ai = t.tour[a], bi = t.tour[b];
-        auto an = {t.tour[(a-1+t.dimension)%t.dimension], t.tour[(a+1+t.dimension)%t.dimension]}, 
-        bn = {t.tour[(b-1+t.dimension)%t.dimension], t.tour[(b+1+t.dimension)%t.dimension]};
-        
-        for (auto f : an) {
-            t.length -= g.dist(ai, f);
-        }
-        for (auto f : bn) {
-            t.length -= g.dist(bi, f);
-        }
-        for (auto f : an) {
-            t.length += g.dist(bi, f);
-        }
-        for (auto f : bn) {
-            t.length += g.dist(ai, f);
-        }
-        t.tour[a] = bi;
-        t.tour[b] = ai;
-    }
-}
-
-void swap_2opt(Tour& t, int i, int j) {
-    std::reverse(t.tour.begin()+i, t.tour.begin()+j+1);
-}
-
-void tsp_2opt(TSP_Graph& g) {
-    Tour tour = Tour(g.dimension);
-    for (int i = 1; i <= g.dimension; ++i) {
-        tour.tour[i-1] = g.dimension-i+1;
-    }
-    tour.length = calculate_dist(g, tour.tour);
-    Tour best = tour;
-    for (int n_shuffles = 0; n_shuffles < 20; ++n_shuffles) {
-        Tour best_local = tour;
-        for (int i = 0; i < best_local.dimension; ++i) {
-            std::cout << best_local.tour[i] << " " << tour.tour[i] << std::endl;
-        }
-        shuffle_tour(g, best_local);
-        bool better = false;
-        do {
-            better = false;
-            std::pair<int, int> best_ij;
-            int best_impr = 0;
-            for (int i = 1; i < g.dimension-2; ++i) {
-                for (int j = i+1; j < g.dimension-1; ++j) {
-                    std::cout << g.dist(best_local.tour[i], best_local.tour[i-1]) << " " << g.dist(best_local.tour[j+1], best_local.tour[j]) << " " << g.dist(best_local.tour[i], best_local.tour[j+1]) << " " << g.dist(best_local.tour[i-1], best_local.tour[j]) << std::endl;
-                    int impr = g.dist(best_local.tour[i], best_local.tour[i-1]) + g.dist(best_local.tour[j+1], best_local.tour[j]) - 
-                    (g.dist(best_local.tour[i], best_local.tour[j+1]) + g.dist(best_local.tour[i-1], best_local.tour[j]));
-                    std::cout << impr << std::endl;
-                    if (impr > 0) {
-                        better = true;
-                        if (impr > best_impr) {
-                            best_ij = {i, j};
-                            best_impr = impr;
-                        }
-                    }
-                }
-            }
-            std::cout << "paras " << best_impr << " " << best_ij.first << " " <<  best_ij.second << std::endl;
-            int tmp; std::cin >> tmp;
-            if (better) {
-                swap_2opt(best_local, best_ij.first, best_ij.second);
-                best_local.length -= best_impr;
-            }
-            
-        } while (better);
-        if (best_local.length < best.length) {
-            best = best_local;
-        }
-    }
-    std::cout << "Smallest route: " << best.length << std::endl;
-}
-
-
 Graph prim_1tree(TSP_Graph& g) {
     std::vector<bool> picked = std::vector<bool>(g.dimension+1, false);
     std::vector<std::pair<float, int>> value = std::vector<std::pair<float, int>>(g.dimension+1, {std::numeric_limits<float>::max(), -1});
@@ -283,7 +192,7 @@ std::vector<std::vector<float>> calculate_alpha(TSP_Graph& g, Graph one_tree) {
         mark[i] = 0;
     for (int i = 2; i <= g.dimension; ++i) {
         int node_id = one_tree.topo[i-2];
-        b[node_id] = 0;
+        b[node_id] = -1<<28;
         int j = 0;
         for (int k = node_id; k != 2; k = j) {
             j = one_tree.dad[k];
@@ -302,30 +211,125 @@ std::vector<std::vector<float>> calculate_alpha(TSP_Graph& g, Graph one_tree) {
     return alpha;
 }
 
-
-
-
-
-void tsp_naive(TSP_Graph& g) {
-    std::vector<int> perm = std::vector<int>(g.dimension);
-    for (int i = 0; i < g.dimension; ++i)
-        perm[i] = i;
-    TSP_Solution best = TSP_Solution(calculate_dist(g, perm), perm);
-    while (std::next_permutation(perm.begin(), perm.end())) {
-        float new_cost = calculate_dist(g, perm);
-        if (new_cost < best.cost) {
-            best = TSP_Solution(new_cost, perm);
+std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>& p, std::vector<float>& pi) {
+    int NDIM = p.size();
+    int n = p[0].size();
+    auto c = [&p](int i, int j) {
+        float c_ij = 0;
+        for (int k = 0; k < p.size(); ++k) {
+            float c_k = p[k][i]-p[k][j];
+            c_ij += c_k * c_k;
+        }
+        return c_ij;
+    };
+    std::vector<bool> picked = std::vector<bool>(n, false);
+    std::vector<std::pair<float, int>> value = std::vector<std::pair<float, int>>(n, {std::numeric_limits<float>::max(), -1});
+    int excluded_vertex = 0;
+    int start_vertex = (excluded_vertex+1)%n;
+    value[start_vertex] = {0, start_vertex};
+    std::set<std::pair<float, int>> pq;
+    pq.insert({0, start_vertex});
+    float length = 0;
+    std::vector<int> degrees(n);
+    while (!pq.empty()) {
+        const auto& [current_value, current_vertex] = *pq.begin();
+        pq.erase(pq.begin());
+        if (picked[current_vertex]) {
+            continue;
+        }
+        degrees[current_vertex]++;
+        degrees[value[current_vertex].second]++;
+        picked[current_vertex] = true;
+        for (int i = 0; i < n; ++i) {
+            if (i == current_vertex || picked[i] || i == excluded_vertex)
+                continue;
+            float new_len = c(i, current_vertex);
+            if (current_value+new_len < value[i].first) {
+                auto old = pq.find({value[i].first, i});
+                if (old != pq.end())
+                    pq.erase(old);
+                pq.insert({current_value+new_len, i});
+                value[i] = {current_value+new_len, current_vertex};
+            }
+            
         }
     }
-    std::cout << "Real best: " << best.cost << std::endl;
+    std::pair<int, float> edge_lens[2] = {{-1, std::numeric_limits<float>::max()}, {-1, std::numeric_limits<float>::max()}};
+    for (int i = 0; i < n; ++i) {
+        if (i == excluded_vertex)
+            continue;
+        float len = c(excluded_vertex, i);
+        if (len < edge_lens[1].second && len < edge_lens[0].second) {
+            edge_lens[1] = edge_lens[0];
+            edge_lens[0] = {i, len};
+        } else if (len < edge_lens[1].second) {
+            edge_lens[1] = {i, len};
+        }
+    }
+    length += edge_lens[0].second + edge_lens[1].second;
+    degrees[edge_lens[0].first]++;
+    degrees[edge_lens[1].first]++;
+    return {length, degrees};
 }
 
+void subgradient_opt_alpha(std::vector<std::vector<float>>& p) {
+    int NDIM = p.size();
+    int n = p[0].size();
+    std::vector<float> pi(n, 0);
+    float W = -1<<28;
+    float t = 1.0;
+    int period = n/2;
+    int np = 4;
+    while (true) {
+        const auto& [length, d] = prim_onetree(p, pi);
+        float w = length;
+        for (int i = 0; i < n; ++i)
+            w -= pi[i];
+        W = std::max(W, w);
+        bool is_tour = true;
+        std::vector<int> v(n);
+        for (int i = 0; i < n; ++i) {
+            v[i] = d[i] - 2;
+            is_tour &= v[i] == 0;
+        }
+        for (int i = 0; i < n; ++i)
+            pi[i] = pi[i] + t * v[i];
+        period--;
+        if (period == 0) {
+            t *= 0.5;
+            period = n/np;
+            np *= 2;
+        }
+        std::cout << is_tour << " " << t << " " << period << std::endl;
+        if (is_tour || t < 0.001 || period == 0) 
+            break;
+    }
+    std::cout << "Done, pi:" << std::endl;
+    for (int i = 0; i < n; ++i)
+        std::cout << pi[i] << " ";
+    std::cout << std::endl;
+}
+
+
 int main(int argc, char** argv) {
-    std::srand(std::time(nullptr));
-    TSP_Graph graph = read_graph(argv[1]);
-    tsp_2opt(graph);
-    auto one_tree = prim_1tree(graph);
-    auto alpha = calculate_alpha(graph, one_tree);
-    std::cout << "Best: " << read_optimal(graph, argv[1]) << std::endl;
+    std::srand(42);
+    //TSP_Graph graph = read_graph(argv[1]);
+    std::vector<std::vector<float>> p;
+    const int NDIM = 2;
+    for (int i = 0; i < NDIM; ++i) {
+        p.push_back(std::vector<float>());
+    }
+    int n = std::stoi(argv[1]);
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < NDIM; ++j) {
+            p[j].push_back(rand()%200);
+        }
+    }
+    subgradient_opt_alpha(p);
+
+    //auto one_tree = prim_1tree(graph);
+    //auto alpha = calculate_alpha(graph, one_tree);
+
+    //std::cout << "Best: " << read_optimal(graph, argv[1]) << std::endl;
     //tsp_naive(graph);
 }
