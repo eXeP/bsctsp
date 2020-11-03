@@ -1,2 +1,5 @@
 .vscode/
 tsp
+*.o
+tsp
+tsp_gpu
