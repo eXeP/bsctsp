@@ -1,4 +1,5 @@
 #include <bits/stdc++.h>
+#include "tsp_2opt.cuh"
 
 struct Graph {
     int nodes;
@@ -214,8 +215,8 @@ std::vector<std::vector<float>> calculate_alpha(TSP_Graph& g, Graph one_tree) {
 std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>& p, std::vector<float>& pi) {
     int NDIM = p.size();
     int n = p[0].size();
-    auto c = [&p](int i, int j) {
-        float c_ij = 0;
+    auto c = [&p, &pi](int i, int j) {
+        float c_ij = pi[i] + pi[j];
         for (int k = 0; k < p.size(); ++k) {
             float c_k = p[k][i]-p[k][j];
             c_ij += c_k * c_k;
@@ -232,24 +233,29 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
     float length = 0;
     std::vector<int> degrees(n);
     while (!pq.empty()) {
-        const auto& [current_value, current_vertex] = *pq.begin();
+        auto [current_value, current_vertex] = *pq.begin();
         pq.erase(pq.begin());
         if (picked[current_vertex]) {
             continue;
         }
-        degrees[current_vertex]++;
-        degrees[value[current_vertex].second]++;
+        if (current_vertex != value[current_vertex].second) {
+            degrees[current_vertex]++;
+            degrees[value[current_vertex].second]++;
+        }
+        length += value[current_vertex].first;
+        //std::cout << "valitaan " <<current_vertex << "-" << value[current_vertex].second << " "  << value[current_vertex].first << std::endl;
         picked[current_vertex] = true;
         for (int i = 0; i < n; ++i) {
             if (i == current_vertex || picked[i] || i == excluded_vertex)
                 continue;
             float new_len = c(i, current_vertex);
-            if (current_value+new_len < value[i].first) {
+            if (new_len < value[i].first) {
                 auto old = pq.find({value[i].first, i});
                 if (old != pq.end())
                     pq.erase(old);
-                pq.insert({current_value+new_len, i});
-                value[i] = {current_value+new_len, current_vertex};
+                pq.insert({new_len, i});
+                //std::printf("lisataan %d %d %.2f\n", current_vertex, i, new_len);
+                value[i] = {new_len, current_vertex};
             }
             
         }
@@ -266,9 +272,12 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
             edge_lens[1] = {i, len};
         }
     }
+    //std::printf("valitaan %d %d %.2f\n", excluded_vertex, edge_lens[0].first, edge_lens[0].second);
+    //std::printf("valitaan %d %d %.2f\n", excluded_vertex, edge_lens[1].first, edge_lens[1].second);
     length += edge_lens[0].second + edge_lens[1].second;
     degrees[edge_lens[0].first]++;
     degrees[edge_lens[1].first]++;
+    degrees[excluded_vertex] += 2;
     return {length, degrees};
 }
 
@@ -292,15 +301,18 @@ void subgradient_opt_alpha(std::vector<std::vector<float>>& p) {
             v[i] = d[i] - 2;
             is_tour &= v[i] == 0;
         }
-        for (int i = 0; i < n; ++i)
+        for (int i = 0; i < n; ++i) {
             pi[i] = pi[i] + t * v[i];
+            //std::cout << v[i] << " ";
+        }
+        //std::cout << std::endl;
         period--;
         if (period == 0) {
             t *= 0.5;
             period = n/np;
             np *= 2;
         }
-        std::cout << is_tour << " " << t << " " << period << std::endl;
+        std::cout << is_tour << " " << t << " " << period << " " << length << std::endl;
         if (is_tour || t < 0.001 || period == 0) 
             break;
     }
@@ -327,6 +339,7 @@ int main(int argc, char** argv) {
     }
     subgradient_opt_alpha(p);
 
+    gpu_subgradient_opt_alpha(p[0].data(), p[1].data(), n);
     //auto one_tree = prim_1tree(graph);
     //auto alpha = calculate_alpha(graph, one_tree);
 
