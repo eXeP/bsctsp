@@ -3,3 +3,5 @@ tsp
 *.o
 tsp
 tsp_gpu
+*.out
+*.in
