@@ -241,10 +241,10 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
         if (current_vertex != value[current_vertex].second) {
             degrees[current_vertex]++;
             degrees[value[current_vertex].second]++;
-            length += std::log(value[current_vertex].first);
+            length += value[current_vertex].first;
         }
         
-        std::cout << "valitaan " << std::min(current_vertex, value[current_vertex].second) << "-" << std::max(current_vertex, value[current_vertex].second) << " "  << value[current_vertex].first << std::endl;
+        //std::cout << "valitaan " << std::min(current_vertex, value[current_vertex].second) << "-" << std::max(current_vertex, value[current_vertex].second) << " "  << value[current_vertex].first << std::endl;
         picked[current_vertex] = true;
         for (int i = 0; i < n; ++i) {
             if (i == current_vertex || picked[i] || i == excluded_vertex)
@@ -273,9 +273,9 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
             edge_lens[1] = {i, len};
         }
     }
-    std::printf("valitaan %d %d %.2f\n", excluded_vertex, edge_lens[0].first, edge_lens[0].second);
-    std::printf("valitaan %d %d %.2f\n", excluded_vertex, edge_lens[1].first, edge_lens[1].second);
-    length += std::log(edge_lens[0].second) + std::log(edge_lens[1].second);
+    //std::printf("valitaan %d %d %.2f\n", excluded_vertex, edge_lens[0].first, edge_lens[0].second);
+    //std::printf("valitaan %d %d %.2f\n", excluded_vertex, edge_lens[1].first, edge_lens[1].second);
+    length += edge_lens[0].second + edge_lens[1].second;
     degrees[edge_lens[0].first]++;
     degrees[edge_lens[1].first]++;
     degrees[excluded_vertex] += 2;
@@ -304,9 +304,9 @@ std::vector<float> subgradient_opt_alpha(std::vector<std::vector<float>>& p) {
         }
         for (int i = 0; i < n; ++i) {
             pi[i] = pi[i] + t * v[i];
-            std::cout << v[i] << " ";
+            //std::cout << v[i] << " ";
         }
-        std::cout << std::endl;
+        //std::cout << std::endl;
         period--;
         if (period == 0) {
             t *= 0.5;
@@ -314,7 +314,7 @@ std::vector<float> subgradient_opt_alpha(std::vector<std::vector<float>>& p) {
             np *= 2;
         }
         std::cout << is_tour << " " << t << " " << period << " " << length << std::endl;
-        if (is_tour || t < 0.001 || period == 0 || true) 
+        if (is_tour || t < 0.001 || period == 0) 
             break;
     }
     std::cout << "Done, pi:" << std::endl;
@@ -333,13 +333,17 @@ int main(int argc, char** argv) {
     int n = std::stoi(argv[1]);
     
     const int NDIM = 2;
-    if (n == 100) {
-        std::vector<std::vector<float>> p;
-        std::ifstream in("fail.in");
-        p = std::vector<std::vector<float>>(2, std::vector<float>(n));
+    
+    std::vector<std::vector<float>> p;
+    for (int tests; tests < 10000; ++tests) {
+        p.clear();
+        for (int i = 0; i < NDIM; ++i) {
+            p.push_back(std::vector<float>());
+        }
+        
         for (int i = 0; i < n; ++i) {
             for (int j = 0; j < NDIM; ++j) {
-                in >> p[j][i];
+                p[j].push_back(rand()%2000+((float) rand() / (RAND_MAX)));
             }
         }
         auto piCPU = subgradient_opt_alpha(p);
@@ -354,65 +358,16 @@ int main(int argc, char** argv) {
                 std::cout << "Eroaa: " << i << " " << piCPU[i] << " vs " << piGPU[i] << std::endl;
             }
         }
-    }
-    else if (n == 2) {
-        std::vector<std::vector<float>> p;
-        std::ifstream in("fail2.in");
-        p = std::vector<std::vector<float>>(2, std::vector<float>(n));
-        for (int i = 0; i < n; ++i) {
-            for (int j = 0; j < NDIM; ++j) {
-                in >> p[j][i];
-            }
-        }
-        auto piCPU = subgradient_opt_alpha(p);
-
-        auto piGPU = gpu_subgradient_opt_alpha(p[0].data(), p[1].data(), n);
-        std::cout << "\n------CHECK------\n";
-        std::cout << "seed: " << seed << std::endl;
-        bool diff = false;
-        for (int i = 0; i < n; ++i) {
-            if (abs(piCPU[i]-piGPU[i]) > 0.0001) {
-                diff = true;
-                std::cout << "Eroaa: " << i << " " << piCPU[i] << " vs " << piGPU[i] << std::endl;
-            }
-        }
-    }
-    else {
-        std::vector<std::vector<float>> p;
-        for (int tests; tests < 10000; ++tests) {
-            p.clear();
-            for (int i = 0; i < NDIM; ++i) {
-                p.push_back(std::vector<float>());
-            }
-            
+        if (diff) {
             for (int i = 0; i < n; ++i) {
                 for (int j = 0; j < NDIM; ++j) {
-                    p[j].push_back(rand()%2000);
-                }
-            }
-            auto piCPU = subgradient_opt_alpha(p);
-
-            auto piGPU = gpu_subgradient_opt_alpha(p[0].data(), p[1].data(), n);
-            std::cout << "\n------CHECK------\n";
-            std::cout << "seed: " << seed << std::endl;
-            bool diff = false;
-            for (int i = 0; i < n; ++i) {
-                if (abs(piCPU[i]-piGPU[i]) > 0.0001) {
-                    diff = true;
-                    std::cout << "Eroaa: " << i << " " << piCPU[i] << " vs " << piGPU[i] << std::endl;
-                }
-            }
-            if (diff) {
-                for (int i = 0; i < n; ++i) {
-                    for (int j = 0; j < NDIM; ++j) {
-                        std::cout << p[j][i] << " ";
-                    }
-                    std::cout << std::endl;
+                    std::cout << p[j][i] << " ";
                 }
                 std::cout << std::endl;
-                return 0;
-            } 
-        }
+            }
+            std::cout << std::endl;
+            return 0;
+        } 
     }
     
     

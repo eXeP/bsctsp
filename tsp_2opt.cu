@@ -369,17 +369,16 @@ __global__ void boruvka_smallest_kernel(int n, float* x, float* y, float* pi, in
                     component_best_i[component_i] = tmp_i;
                     component_best_j[component_i] = best_j;
                 } else if (abs(best - component_best[component_i]) < 0.0000001) {
-                    
                     int mi_c = min(tmp_i, best_j), ma_c = max(tmp_i, best_j);
                     int mi_o = min(component_best_i[component_i], component_best_j[component_i]), ma_o = max(component_best_i[component_i], component_best_j[component_i]);
-                    if (mi_c > mi_o) {
+                    if (mi_c < mi_o) {
                         component_best_i[component_i] = tmp_i;
                         component_best_j[component_i] = best_j;
-                    } else if (mi_c == mi_o && ma_c > ma_o) {
+                    } else if (mi_c == mi_o && ma_c < ma_o) {
                         component_best_i[component_i] = tmp_i;
                         component_best_j[component_i] = best_j;
                     }
-                    printf("oli samat %f %d-%d %d-%d val %d-%d\n", best, tmp_i, best_j, component_best_i[component_i], component_best_j[component_i], component_best_i[component_i], component_best_j[component_i]);
+                    //printf("oli samat %f %d-%d %d-%d val %d-%d\n", best, tmp_i, best_j, component_best_i[component_i], component_best_j[component_i], component_best_i[component_i], component_best_j[component_i]);
                 }
                 component_lock[component_i] = 0;  // release
                 __threadfence();
@@ -410,14 +409,14 @@ __global__ void boruvka_update_components(int n,
         //Cycle!
         if (vertex_jj == i) {
             if (i < vertex_ij) {
-                printf("valitaan %d-%d %.2f %d-%d\n", min(i, vertex_ij), max(i, vertex_ij), component_best[component_i], blockIdx.x, blockIdx.y, component_i, component_j);
+                //printf("valitaan %d-%d %.2f %d-%d\n", min(i, vertex_ij), max(i, vertex_ij), component_best[component_i], blockIdx.x, blockIdx.y, component_i, component_j);
                 atomicSub(components, 1);
-                atomicAdd(L_T, log(component_best[component_i]));
+                atomicAdd(L_T, component_best[component_i]);
             }
         } else {
-            printf("valitaan %d-%d %.2f %d-%d\n", min(i, vertex_ij), max(i, vertex_ij), component_best[component_i], blockIdx.x, blockIdx.y, component_i, component_j);
+            //printf("valitaan %d-%d %.2f %d-%d\n", min(i, vertex_ij), max(i, vertex_ij), component_best[component_i], blockIdx.x, blockIdx.y, component_i, component_j);
             atomicSub(components, 1);
-            atomicAdd(L_T, log(component_best[component_i]));
+            atomicAdd(L_T, component_best[component_i]);
             atomicAdd(&degrees[i], 1);
             atomicAdd(&degrees[vertex_ij], 1);
         }
@@ -484,9 +483,9 @@ __global__ void excluded_vertex_set(float* closest, int* closest_i, int* degrees
     degrees[excluded_vertex] += 2;
     degrees[closest_i[0]]++;
     degrees[closest_i[1]]++;
-    printf("valitaan %d-%d %.2f\n", excluded_vertex, closest_i[0], closest[0]);
-    printf("valitaan %d-%d %.2f\n", excluded_vertex, closest_i[1], closest[1]);
-    L_T[0] += log(closest[0]) + log(closest[1]);
+    //printf("valitaan %d-%d %.2f\n", excluded_vertex, closest_i[0], closest[0]);
+    //printf("valitaan %d-%d %.2f\n", excluded_vertex, closest_i[1], closest[1]);
+    L_T[0] += closest[0] + closest[1];
 }
 
 
@@ -611,9 +610,9 @@ std::vector<float> gpu_subgradient_opt_alpha(float* x, float* y, int n) {
         }
         for (int i = 0; i < n; ++i) {
             pi[i] = pi[i] + t * v[i];
-            std::cout << v[i] << " ";
+            //std::cout << v[i] << " ";
         }
-        std::cout << std::endl;
+        //std::cout << std::endl;
         period--;
         if (period == 0) {
             t *= 0.5;
@@ -621,7 +620,7 @@ std::vector<float> gpu_subgradient_opt_alpha(float* x, float* y, int n) {
             np *= 2;
         }
         std::cout << is_tour << " " << t << " " << period << " " << length << std::endl;
-        if (is_tour || t < 0.001 || period == 0 || true) 
+        if (is_tour || t < 0.001 || period == 0) 
             break;
         cudaMemcpy(Gpi, pi.data(), n * sizeof(float), cudaMemcpyHostToDevice);
         cudaDeviceSynchronize();
