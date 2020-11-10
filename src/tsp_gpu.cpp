@@ -259,7 +259,7 @@ std::pair<int, int> two_opt_best(std::vector<int> x, std::vector<int> y) {
 int main(int argc, char** argv) {
     std::srand(42);
 
-    std::vector<int> x, y;
+    std::vector<float> x, y;
     int n = std::stoi(argv[1]);
     for (int i = 0; i < n; ++i) {
         x.push_back(rand()%200);

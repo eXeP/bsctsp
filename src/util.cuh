@@ -29,8 +29,8 @@ __device__ inline int roundupg(int a, int b) {
     return divup(a, b) * b;
 }
 
-__device__ static inline int dist(int x1, int y1, int x2, int y2) {
-    int dx = x1-x2;
-    int dy = y1-y2;
+__device__ static inline float dist(float x1, float y1, float x2, float y2) {
+    float dx = x1-x2;
+    float dy = y1-y2;
     return dx*dx+dy*dy;
 }
