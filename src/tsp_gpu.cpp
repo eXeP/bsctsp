@@ -1,4 +1,5 @@
 #include <bits/stdc++.h>
+#include "tsp_preprocessing.cuh"
 #include "tsp_2opt.cuh"
 
 struct Graph {
