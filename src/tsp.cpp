@@ -1,5 +1,6 @@
 #include <bits/stdc++.h>
 #include "tsp_2opt.cuh"
+#include "tsp_preprocessing.cuh"
 
 struct Graph {
     int nodes;
@@ -223,6 +224,17 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
         }
         return c_ij;
     };
+
+    auto cd = [&p, &pi](int i, int j) {
+        float c_ij = pi[i] + pi[j];
+        
+        for (int k = 0; k < p.size(); ++k) {
+            float c_k = p[k][i]-p[k][j];
+            c_ij += c_k * c_k;
+        }
+        //printf("wtf %d %d %f %f %f %f %f %f %f %f %f %f %f\n", i, j, pi[i], pi[j], c_ij, p[0][i], p[0][j], p[1][i], p[1][j], (p[0][i] - p[0][j]), (p[1][i] - p[1][j]), (p[0][i] - p[0][j])*(p[0][i] - p[0][j]), (p[1][i] - p[1][j])*(p[1][i] - p[1][j]));
+        return c_ij;
+    };
     std::vector<bool> picked = std::vector<bool>(n, false);
     std::vector<std::pair<float, int>> value = std::vector<std::pair<float, int>>(n, {std::numeric_limits<float>::max(), -1});
     int excluded_vertex = 0;
@@ -244,12 +256,12 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
             length += value[current_vertex].first;
         }
         
-        //std::cout << "valitaan " << std::min(current_vertex, value[current_vertex].second) << "-" << std::max(current_vertex, value[current_vertex].second) << " "  << value[current_vertex].first << std::endl;
+        std::cout << "valitaan " << std::min(current_vertex, value[current_vertex].second) << "-" << std::max(current_vertex, value[current_vertex].second) << " "  << value[current_vertex].first << std::endl;
         picked[current_vertex] = true;
         for (int i = 0; i < n; ++i) {
             if (i == current_vertex || picked[i] || i == excluded_vertex)
                 continue;
-            float new_len = c(i, current_vertex);
+            float new_len = cd(i, current_vertex);
             if (new_len < value[i].first) {
                 auto old = pq.find({value[i].first, i});
                 if (old != pq.end())
@@ -265,7 +277,7 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
     for (int i = 0; i < n; ++i) {
         if (i == excluded_vertex)
             continue;
-        float len = c(excluded_vertex, i);
+        float len = cd(excluded_vertex, i);
         if (len < edge_lens[1].second && len < edge_lens[0].second) {
             edge_lens[1] = edge_lens[0];
             edge_lens[0] = {i, len};
@@ -273,8 +285,8 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
             edge_lens[1] = {i, len};
         }
     }
-    //std::printf("valitaan %d %d %.2f\n", excluded_vertex, edge_lens[0].first, edge_lens[0].second);
-    //std::printf("valitaan %d %d %.2f\n", excluded_vertex, edge_lens[1].first, edge_lens[1].second);
+    std::printf("valitaan2 %d-%d %.2f\n", excluded_vertex, edge_lens[0].first, edge_lens[0].second);
+    std::printf("valitaan2 %d-%d %.2f\n", excluded_vertex, edge_lens[1].first, edge_lens[1].second);
     length += edge_lens[0].second + edge_lens[1].second;
     degrees[edge_lens[0].first]++;
     degrees[edge_lens[1].first]++;
@@ -282,49 +294,59 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
     return {length, degrees};
 }
 
-std::vector<float> subgradient_opt_alpha(std::vector<std::vector<float>>& p) {
-    int NDIM = p.size();
-    int n = p[0].size();
-    std::vector<float> pi(n, 0);
-    float W = -1<<28;
-    float t = 1.0;
-    int period = n/2;
-    int np = 4;
-    while (true) {
-        const auto& [length, d] = prim_onetree(p, pi);
-        float w = length;
-        for (int i = 0; i < n; ++i)
-            w -= pi[i];
-        W = std::max(W, w);
-        bool is_tour = true;
-        std::vector<int> v(n);
-        for (int i = 0; i < n; ++i) {
-            v[i] = d[i] - 2;
-            is_tour &= v[i] == 0;
-        }
-        for (int i = 0; i < n; ++i) {
-            pi[i] = pi[i] + t * v[i];
-            //std::cout << v[i] << " ";
-        }
-        //std::cout << std::endl;
-        period--;
-        if (period == 0) {
-            t *= 0.5;
-            period = n/np;
-            np *= 2;
-        }
-        std::cout << is_tour << " " << t << " " << period << " " << length << std::endl;
-        if (is_tour || t < 0.001 || period == 0) 
-            break;
+std::vector<float> subgradient_opt_alpha(std::vector<std::vector<float>>& coord) {
+    int NDIM = coord.size();
+    int n = coord[0].size();
+    std::vector<float> pi(n, 0), best_pi(n, 0);
+    const auto& [init_w, init_d] = prim_onetree(coord, pi);
+    float best_w = init_w;
+    std::vector<int> last_v(n), v(n);
+    bool is_tour = true;
+    for (int i = 0; i < n; ++i) {
+        last_v[i] = init_d[i] - 2;
+        v[i] = last_v[i];
+        is_tour &= (last_v[i] == 0);
     }
-    std::cout << "Done, pi:" << std::endl;
+    bool initial_phase = true;
+    int initial_period = std::max(n/2, 100);
+    int period = initial_period;
+    for (float t = 1.f; t > 0; t /= 2.f, period /= 2) {
+        for (int p = 1; t > 0 && p <= period; ++p) {
+            for (int i = 0; i < n; ++i) {
+                pi[i] += t * ( 0.7f * v[i] + 0.3f * last_v[i]);
+                std::cout << pi[i] << " ";
+            }
+            std::cout << std::endl;
+            last_v = v;
+            const auto& [w, d] = prim_onetree(coord, pi);
+            is_tour = true;
+            for (int i = 0; i < n; ++i) {
+                v[i] = d[i] - 2;
+                is_tour &= (v[i] == 0);
+            }
+            std::cout << is_tour << " " << t << " " << period << " " << p << " " << w << std::endl;
+            if (w > best_w) {
+                best_w = w;
+                best_pi = pi;
+                if (initial_phase)
+                    t *= 2.f;
+                if (p == period)
+                    period *= 2;
+            } else if (initial_phase && p > initial_period / 2) {
+                initial_phase = false;
+                p = 0;
+                t = 0.75f * t;
+            }
+        }
+    }
+    std::cout << "Done, best pi:" << std::endl;
     for (int i = 0; i < n; ++i)
-        std::cout << pi[i] << " ";
+        std::cout << best_pi[i] << " ";
     std::cout << std::endl;
-    return pi;
+    return best_pi;
 }
-//cpu 230331696
-//gpu 230331744
+
+
 int main(int argc, char** argv) {
     //std::srand(42);
     std::cout << std::setprecision(20);
@@ -353,9 +375,9 @@ int main(int argc, char** argv) {
         std::cout << "seed: " << seed << std::endl;
         bool diff = false;
         for (int i = 0; i < n; ++i) {
-            if (abs(piCPU[i]-piGPU[i]) > 0.0001) {
+            if (abs(piCPU[i]-piGPU[i]) > 0.001) {
                 diff = true;
-                std::cout << "Eroaa: " << i << " " << piCPU[i] << " vs " << piGPU[i] << std::endl;
+                std::cout << tests <<" Eroaa: " << i << " " << piCPU[i] << " vs " << piGPU[i] << std::endl;
             }
         }
         if (diff) {
