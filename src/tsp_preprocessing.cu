@@ -43,9 +43,6 @@ __global__ void boruvka_smallest_kernel(int n, float* x, float* y, float* pi, in
                 float d_ij = pi_i + shared_pi[k];
                 d_ij += (x_i - shared_x[k]) * (x_i - shared_x[k]);
                 d_ij += (y_i - shared_y[k]) * (y_i - shared_y[k]);
-                printf("wtf %d %d %f %f %f %f %f %f %f %f %f %f %f\n", i, j+k, pi_i, shared_pi[k], 
-                d_ij, x_i, shared_x[k], y_i, shared_y[k], (x_i - shared_x[k]), (y_i - shared_y[k]), 
-                (x_i - shared_x[k]) * (x_i - shared_x[k]), (y_i - shared_y[k]) * (y_i - shared_y[k]));
                 if (d_ij < best) {
                     best = d_ij;
                     best_j = j+k;
@@ -109,21 +106,17 @@ __global__ void boruvka_update_components(int n,
     int component_i = component[i];
     int component_j = component[component_best_j[component_i]];
     
-    int component_min = min(component_i, component_j);
     component[i] = successor[i];
     int vertex_ii = component_best_i[component_i];
-    int vertex_ji = component_best_i[component_j];
     int vertex_ij = component_best_j[component_i];
     int vertex_jj = component_best_j[component_j];
     if (i == vertex_ii) {
         if (vertex_jj == i) {
             if (i < vertex_ij) {
-                printf("valitaan %d-%d %.2f %d-%d\n", min(i, vertex_ij), max(i, vertex_ij), component_best[component_i], blockIdx.x, blockIdx.y, component_i, component_j);
                 atomicSub(components, 1);
                 atomicAdd(L_T, component_best[component_i]);
             }
         } else {
-            printf("valitaan %d-%d %.2f %d-%d\n", min(i, vertex_ij), max(i, vertex_ij), component_best[component_i], blockIdx.x, blockIdx.y, component_i, component_j);
             atomicSub(components, 1);
             atomicAdd(L_T, component_best[component_i]);
             atomicAdd(&degrees[i], 1);
@@ -143,7 +136,6 @@ __global__ void boruvka_remove_cycles(int n,
     int component_j = component[component_best_j[component_i]];
 
     int vertex_ii = component_best_i[component_i];
-    int vertex_ji = component_best_i[component_j];
     int vertex_ij = component_best_j[component_i];
     int vertex_jj = component_best_j[component_j];
     if (i == vertex_ii) {
@@ -173,7 +165,6 @@ __global__ void excluded_vertex_add(int n,
     float d_ij = pi[excluded_vertex] + pi[i];
     d_ij += (x[excluded_vertex] - x[i]) * (x[excluded_vertex] - x[i]);
     d_ij += (y[excluded_vertex] - y[i]) * (y[excluded_vertex] - y[i]);
-    printf("wtf %d %d %f %f %f %f %f %f %f %f %f %f %f\n", excluded_vertex, i, pi[excluded_vertex], pi[i], d_ij, x[excluded_vertex], x[i], y[excluded_vertex], y[i], (x[excluded_vertex] - x[i]), (y[excluded_vertex] - y[i]), (x[excluded_vertex] - x[i]) * (x[excluded_vertex] - x[i]), (y[excluded_vertex] - y[i]) * (y[excluded_vertex] - y[i]));
     if (d_ij < closest[0] || d_ij < closest[1]) {
         while (atomicExch(&lock[0], 1) != 0);
         if (d_ij < closest[0] && d_ij < closest[1]) {
@@ -194,8 +185,6 @@ __global__ void excluded_vertex_set(float* closest, int* closest_i, int* degrees
     degrees[excluded_vertex] += 2;
     degrees[closest_i[0]]++;
     degrees[closest_i[1]]++;
-    printf("valitaan2 %d-%d %.2f\n", excluded_vertex, closest_i[0], closest[0]);
-    printf("valitaan2 %d-%d %.2f\n", excluded_vertex, closest_i[1], closest[1]);
     L_T[0] += closest[0] + closest[1];
 }
 
@@ -218,7 +207,6 @@ std::pair<float, std::vector<int>> gpu_boruvka_onetree(int n, float* Gx, float* 
 
     float* Gsmallest_add = NULL;
     cudaMalloc((void**)&Gsmallest_add, n * sizeof(float));
-
 
     int* Gsmallest_i = NULL;
     cudaMalloc((void**)&Gsmallest_i, n * sizeof(int));
@@ -245,8 +233,6 @@ std::pair<float, std::vector<int>> gpu_boruvka_onetree(int n, float* Gx, float* 
 
     std::vector<float> inf(n, std::numeric_limits<float>::max());
     while (components > 1) {
-        cudaMemset(Gsmallest_i, 0, n*sizeof(int));
-        cudaMemset(Gsmallest_j, 0, n*sizeof(int));
         cudaMemcpy(Gsmallest_add, inf.data(), n * sizeof(float), cudaMemcpyHostToDevice);
         boruvka_smallest_kernel<<<dimGrid, dimBlock>>>(n, Gx, Gy, Gpi, Gcomponent, Gsmallest_add, Gsmallest_i, Gsmallest_j, Gvertex_lock, excluded_vertex);
         CHECK(cudaGetLastError());
@@ -266,8 +252,6 @@ std::pair<float, std::vector<int>> gpu_boruvka_onetree(int n, float* Gx, float* 
         cudaDeviceSynchronize();
         cudaMemcpy(&components, Gcomponents, 1 * sizeof(int), cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize();
-        //int tmp;
-        //std::cin >> tmp;
     }
     float* Gclosest = NULL;
     cudaMalloc((void**)&Gclosest, 2 * sizeof(float));
@@ -315,7 +299,7 @@ std::vector<float> gpu_subgradient_opt_alpha(float* x, float* y, int n) {
     cudaMemcpy(Gy, y, n * sizeof(float), cudaMemcpyHostToDevice);
 
     std::vector<float> pi(n, 0), best_pi(n, 0);
-    const auto& [init_w, init_d] = gpu_boruvka_onetree(n, Gx, Gy, Gpi);
+    auto [init_w, init_d] = gpu_boruvka_onetree(n, Gx, Gy, Gpi);
     float best_w = init_w;
     std::vector<int> last_v(n), v(n);
     bool is_tour = true;
@@ -331,19 +315,16 @@ std::vector<float> gpu_subgradient_opt_alpha(float* x, float* y, int n) {
         for (int p = 1; t > 0 && p <= period; ++p) {
             for (int i = 0; i < n; ++i) {
                 pi[i] += t * ( 0.7f * v[i] + 0.3f * last_v[i]);
-                std::cout << pi[i] << " ";
             }
-            std::cout << std::endl;
             cudaMemcpy(Gpi, pi.data(), n * sizeof(float), cudaMemcpyHostToDevice);
             cudaDeviceSynchronize();
             last_v = v;
-            const auto& [w, d] = gpu_boruvka_onetree(n, Gx, Gy, Gpi);
+            auto [w, d] = gpu_boruvka_onetree(n, Gx, Gy, Gpi);
             is_tour = true;
             for (int i = 0; i < n; ++i) {
                 v[i] = d[i] - 2;
                 is_tour &= (v[i] == 0);
             }
-            std::cout << is_tour << " " << t << " " << period << " " << p << " " << w << std::endl;
             if (w > best_w) {
                 best_w = w;
                 best_pi = pi;
@@ -358,10 +339,6 @@ std::vector<float> gpu_subgradient_opt_alpha(float* x, float* y, int n) {
             }
         }
     }
-    std::cout << "Done, best pi:" << std::endl;
-    for (int i = 0; i < n; ++i)
-        std::cout << best_pi[i] << " ";
-    std::cout << std::endl;
     cudaFree(Gpi);
     cudaFree(Gx);
     cudaFree(Gy);

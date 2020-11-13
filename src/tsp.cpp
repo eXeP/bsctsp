@@ -194,7 +194,7 @@ std::vector<std::vector<float>> calculate_alpha(TSP_Graph& g, Graph one_tree) {
         mark[i] = 0;
     for (int i = 2; i <= g.dimension; ++i) {
         int node_id = one_tree.topo[i-2];
-        b[node_id] = -1<<28;
+        b[node_id] = std::numeric_limits<float>::min();
         int j = 0;
         for (int k = node_id; k != 2; k = j) {
             j = one_tree.dad[k];
@@ -214,25 +214,13 @@ std::vector<std::vector<float>> calculate_alpha(TSP_Graph& g, Graph one_tree) {
 }
 
 std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>& p, std::vector<float>& pi) {
-    int NDIM = p.size();
     int n = p[0].size();
     auto c = [&p, &pi](int i, int j) {
         float c_ij = pi[i] + pi[j];
-        for (int k = 0; k < p.size(); ++k) {
+        for (size_t k = 0; k < p.size(); ++k) {
             float c_k = p[k][i]-p[k][j];
             c_ij += c_k * c_k;
         }
-        return c_ij;
-    };
-
-    auto cd = [&p, &pi](int i, int j) {
-        float c_ij = pi[i] + pi[j];
-        
-        for (int k = 0; k < p.size(); ++k) {
-            float c_k = p[k][i]-p[k][j];
-            c_ij += c_k * c_k;
-        }
-        //printf("wtf %d %d %f %f %f %f %f %f %f %f %f %f %f\n", i, j, pi[i], pi[j], c_ij, p[0][i], p[0][j], p[1][i], p[1][j], (p[0][i] - p[0][j]), (p[1][i] - p[1][j]), (p[0][i] - p[0][j])*(p[0][i] - p[0][j]), (p[1][i] - p[1][j])*(p[1][i] - p[1][j]));
         return c_ij;
     };
     std::vector<bool> picked = std::vector<bool>(n, false);
@@ -255,19 +243,16 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
             degrees[value[current_vertex].second]++;
             length += value[current_vertex].first;
         }
-        
-        std::cout << "valitaan " << std::min(current_vertex, value[current_vertex].second) << "-" << std::max(current_vertex, value[current_vertex].second) << " "  << value[current_vertex].first << std::endl;
         picked[current_vertex] = true;
         for (int i = 0; i < n; ++i) {
             if (i == current_vertex || picked[i] || i == excluded_vertex)
                 continue;
-            float new_len = cd(i, current_vertex);
+            float new_len = c(i, current_vertex);
             if (new_len < value[i].first) {
                 auto old = pq.find({value[i].first, i});
                 if (old != pq.end())
                     pq.erase(old);
                 pq.insert({new_len, i});
-                //std::printf("lisataan %d %d %.2f\n", current_vertex, i, new_len);
                 value[i] = {new_len, current_vertex};
             }
             
@@ -277,7 +262,7 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
     for (int i = 0; i < n; ++i) {
         if (i == excluded_vertex)
             continue;
-        float len = cd(excluded_vertex, i);
+        float len = c(excluded_vertex, i);
         if (len < edge_lens[1].second && len < edge_lens[0].second) {
             edge_lens[1] = edge_lens[0];
             edge_lens[0] = {i, len};
@@ -285,8 +270,6 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
             edge_lens[1] = {i, len};
         }
     }
-    std::printf("valitaan2 %d-%d %.2f\n", excluded_vertex, edge_lens[0].first, edge_lens[0].second);
-    std::printf("valitaan2 %d-%d %.2f\n", excluded_vertex, edge_lens[1].first, edge_lens[1].second);
     length += edge_lens[0].second + edge_lens[1].second;
     degrees[edge_lens[0].first]++;
     degrees[edge_lens[1].first]++;
@@ -295,10 +278,9 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
 }
 
 std::vector<float> subgradient_opt_alpha(std::vector<std::vector<float>>& coord) {
-    int NDIM = coord.size();
     int n = coord[0].size();
     std::vector<float> pi(n, 0), best_pi(n, 0);
-    const auto& [init_w, init_d] = prim_onetree(coord, pi);
+    auto [init_w, init_d] = prim_onetree(coord, pi);
     float best_w = init_w;
     std::vector<int> last_v(n), v(n);
     bool is_tour = true;
@@ -314,17 +296,14 @@ std::vector<float> subgradient_opt_alpha(std::vector<std::vector<float>>& coord)
         for (int p = 1; t > 0 && p <= period; ++p) {
             for (int i = 0; i < n; ++i) {
                 pi[i] += t * ( 0.7f * v[i] + 0.3f * last_v[i]);
-                std::cout << pi[i] << " ";
             }
-            std::cout << std::endl;
             last_v = v;
-            const auto& [w, d] = prim_onetree(coord, pi);
+            auto [w, d] = prim_onetree(coord, pi);
             is_tour = true;
             for (int i = 0; i < n; ++i) {
                 v[i] = d[i] - 2;
                 is_tour &= (v[i] == 0);
             }
-            std::cout << is_tour << " " << t << " " << period << " " << p << " " << w << std::endl;
             if (w > best_w) {
                 best_w = w;
                 best_pi = pi;
@@ -339,16 +318,11 @@ std::vector<float> subgradient_opt_alpha(std::vector<std::vector<float>>& coord)
             }
         }
     }
-    std::cout << "Done, best pi:" << std::endl;
-    for (int i = 0; i < n; ++i)
-        std::cout << best_pi[i] << " ";
-    std::cout << std::endl;
     return best_pi;
 }
 
 
 int main(int argc, char** argv) {
-    //std::srand(42);
     std::cout << std::setprecision(20);
     int seed = 42;
     std::srand(seed);
@@ -357,7 +331,7 @@ int main(int argc, char** argv) {
     const int NDIM = 2;
     
     std::vector<std::vector<float>> p;
-    for (int tests; tests < 10000; ++tests) {
+    for (int tests = 0; tests < 10000; ++tests) {
         p.clear();
         for (int i = 0; i < NDIM; ++i) {
             p.push_back(std::vector<float>());
@@ -377,7 +351,7 @@ int main(int argc, char** argv) {
         for (int i = 0; i < n; ++i) {
             if (abs(piCPU[i]-piGPU[i]) > 0.001) {
                 diff = true;
-                std::cout << tests <<" Eroaa: " << i << " " << piCPU[i] << " vs " << piGPU[i] << std::endl;
+                std::cout << tests <<" Diff: " << i << " " << piCPU[i] << " vs " << piGPU[i] << std::endl;
             }
         }
         if (diff) {
