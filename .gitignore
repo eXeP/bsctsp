@@ -5,3 +5,4 @@ tsp
 tsp_gpu
 *.out
 *.in
+solver
