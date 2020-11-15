@@ -42,7 +42,6 @@ __global__ void two_opt_kernel(const float* x, const float* y, best_struct* retu
         if (j <= i || j + blockDim.x >= n) {
             for (int k = 0; k < blockDim.x; ++k) {
                 if (j+k > i && j+k < n-1) {
-                    
                     float k_dist = i_dist + dist(shared_x[k], shared_y[k], shared_x[k+1], shared_y[k+1]) - 
                     (dist(xi, yi, shared_x[k+1], shared_y[k+1]) + dist(xim, yim, shared_x[k], shared_y[k]));
                     if (k_dist > best) {
@@ -115,8 +114,6 @@ void run_gpu_2opt(float* x, float* y, int n) {
 
     dim3 dimBlock(64, 1);
     dim3 dimGrid(divup(n, 64), divup(n, 64));
-    printf("Block (%d %d), Grid(%d, %d)\n", 61, 1, divup(n, 64), divup(n, 64));
-    int steps = 0;
     do {
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
@@ -134,16 +131,14 @@ void run_gpu_2opt(float* x, float* y, int n) {
         cudaDeviceSynchronize();
         if (abs(best[0].best) < 0.000001)
             break;
-        printf("Improvement %d %d %d\n", best[0].best, best[0].i, best[0].j);
+        //printf("Improvement %f %d %d\n", best[0].best, best[0].i, best[0].j);
         two_opt_swap_kernel<<<dim3((best[0].j-best[0].i+1)/2, 1), dim3(1, 1)>>>(xGPU, yGPU, best[0].i, best[0].j);
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
-
-        ++steps;
-        //int tmp;
-        //std::cin >> tmp;
     } while(true);
 
+    cudaMemcpy(x, xGPU, n * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(y, yGPU, n * sizeof(float), cudaMemcpyDeviceToHost);
     cudaFree(xGPU);
     cudaFree(yGPU);
     cudaFree(bestGPU);

@@ -19,18 +19,25 @@ std::pair<std::vector<float>, std::vector<float>> two_opt_best(std::vector<float
     int best_i = 0, best_j = 0;
     while (true) {
         best = 0.f; best_i = 0; best_j = 0;
+        #pragma omp parallel for schedule(static,1)
         for (int i = 1; i < n-2; ++i) {
             for (int j = i+1; j < n-1; ++j) {
                 float new_impr = dist(i, j);
                 if (new_impr > best) {
-                    best = new_impr;
-                    best_i = i;
-                    best_j = j;
+                    #pragma omp critical 
+                    {
+                        if (new_impr > best) {
+                            best = new_impr;
+                            best_i = i;
+                            best_j = j;
+                        }
+                    }
                 }
             }
         }
         if (best == 0.f)
             break;
+        //std::cout << "Improvement " << best << " " << best_i << " " << best_j << std::endl;
         swap_2opt_arr(x, best_i, best_j);
         swap_2opt_arr(y, best_i, best_j);
     }
