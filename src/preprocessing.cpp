@@ -1,28 +1,9 @@
 #include "preprocessing.h"
 
-#include <bits/stdc++.h>
-#include "tsp_2opt.cuh"
-#include "tsp_preprocessing.cuh"
+#include <vector>
+#include <iostream>
 #include "util.h"
 
-static inline float distance(std::vector<std::vector<float>>& coords, int i, int j) {
-    float d = 0;
-    for (int k = 0; k < coords.size(); ++k) {
-        d += (coords[k][i] - coords[k][j]) * (coords[k][i] - coords[k][j]);
-    }
-    return sqrt(d);
-}
-
-static inline float d_ij(std::vector<std::vector<float>>& coords, std::vector<float>& pi, int i, int j) {
-    return pi[i] + pi[j] + distance(coords, i, j);
-}
-
-float calculate_dist(std::vector<std::vector<float>>& coords, std::vector<int>& path) {
-    float dist = 0;
-    for(int i = 0; i < coords[0].size(); ++i)
-        dist += distance(coords, path[i], path[(i+1)%coords[0].size()]);
-    return dist;
-}
 
 std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>& coords, std::vector<float>& pi, one_tree& onetree) {
     int n = coords[0].size();
@@ -265,52 +246,4 @@ std::vector<float> subgradient_opt_alpha(std::vector<std::vector<float>>& coord)
         }
     }
     return best_pi;
-}
-
-
-int main(int argc, char** argv) {
-    std::cout << std::setprecision(20);
-    int seed = 42;
-    std::srand(seed);
-    int n = std::stoi(argv[1]);
-    
-    const int NDIM = 2;
-    
-    std::vector<std::vector<float>> p;
-    for (int tests = 0; tests < 10000; ++tests) {
-        p.clear();
-        for (int i = 0; i < NDIM; ++i) {
-            p.push_back(std::vector<float>());
-        }
-        
-        for (int i = 0; i < n; ++i) {
-            for (int j = 0; j < NDIM; ++j) {
-                p[j].push_back(rand()%2000+((float) rand() / (RAND_MAX)));
-            }
-        }
-        auto piCPU = subgradient_opt_alpha(p);
-
-        auto piGPU = gpu_subgradient_opt_alpha(p[0].data(), p[1].data(), n);
-        std::cout << "\n------CHECK------\n";
-        std::cout << "seed: " << seed << std::endl;
-        bool diff = false;
-        for (int i = 0; i < n; ++i) {
-            if (abs(piCPU[i]-piGPU[i]) > 0.001) {
-                diff = true;
-                std::cout << tests <<" Diff: " << i << " " << piCPU[i] << " vs " << piGPU[i] << std::endl;
-            }
-        }
-        if (diff) {
-            for (int i = 0; i < n; ++i) {
-                for (int j = 0; j < NDIM; ++j) {
-                    std::cout << p[j][i] << " ";
-                }
-                std::cout << std::endl;
-            }
-            std::cout << std::endl;
-            return 0;
-        } 
-    }
-    
-    
 }

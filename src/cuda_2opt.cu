@@ -4,7 +4,7 @@
 #include <cuda_runtime.h>
 #include <float.h>
 
-#include "tsp_2opt.cuh"
+#include "cuda_2opt.cuh"
 #include "util.cuh"
 
 
