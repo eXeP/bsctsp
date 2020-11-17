@@ -159,6 +159,7 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
     pq.insert({0, start_vertex});
     float length = 0;
     std::vector<int> degrees(n);
+   
     while (!pq.empty()) {
         auto [current_value, current_vertex] = *pq.begin();
         pq.erase(pq.begin());
