@@ -13,7 +13,7 @@ static inline float distance(std::vector<std::vector<float>>& coords, int i, int
     for (int k = 0; k < coords.size(); ++k) {
         d += (coords[k][i] - coords[k][j]) * (coords[k][i] - coords[k][j]);
     }
-    return sqrt(d);
+    return d;
 }
 
 static inline float d_ij(std::vector<std::vector<float>>& coords, std::vector<float>& pi, int i, int j) {

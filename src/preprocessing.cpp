@@ -10,28 +10,32 @@ std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>&
     std::vector<std::vector<float>> alpha = std::vector<std::vector<float>>(n, std::vector<float>(n, std::numeric_limits<float>::max()));
     std::vector<int> mark = std::vector<int>(n, 0);
     std::vector<float> b = std::vector<float>(n);
-    for (int from = 0; from < n; ++from) {
+    for (int i = 0; i < n; ++i) {
+        int from = onetree.topo[i];
+        std::cout << from  << " dad " <<  onetree.dad[from] << " eka " << onetree.first_node << std::endl;
         int to = 0;
         if (from != onetree.first_node) {
-            b[from] = std::numeric_limits<float>::min();
-            for (int k = from; k != -1; k = to) {
+            b[from] = std::numeric_limits<float>::min()/10;
+            for (int k = from; k != onetree.first_node; k = to) {
                 to = onetree.dad[k];
-                if (to == -1)
-                    continue;
                 b[to] = std::max(b[k], d_ij(coords, pi, k, to));
                 mark[to] = from;
             }
         }
-        for (to = 0; to < n; ++to) {
+        for (int j = 0; j < n; ++j) {
+            to = onetree.topo[j];
             if (from == onetree.first_node) {
                 alpha[from][to] = (to == onetree.dad[from]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[from];
             } else if (to == onetree.first_node) {
-                alpha[from][to] = (to == onetree.dad[to]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[to];
+                alpha[from][to] = (from == onetree.dad[to]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[to];
             } else {
                 if (mark[to] != from) {
                     b[to] = std::max(b[onetree.dad[to]], d_ij(coords, pi, to, onetree.dad[to]));
                 }
                 alpha[from][to] = d_ij(coords, pi, to, from) - b[to];
+                if (alpha[from][to] < 0) {
+                    std::cout << from << " " << to << " dij " << d_ij(coords, pi, to, from) << " bto " << b[to] << std::endl;
+                }
             }
         }
     }
