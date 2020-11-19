@@ -12,10 +12,10 @@ std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>&
     std::vector<float> b = std::vector<float>(n);
     for (int i = 0; i < n; ++i) {
         int from = onetree.topo[i];
-        std::cout << from  << " dad " <<  onetree.dad[from] << " eka " << onetree.first_node << std::endl;
+        //std::cout << from  << " dad " <<  onetree.dad[from] << " eka " << onetree.first_node << std::endl;
         int to = 0;
         if (from != onetree.first_node) {
-            b[from] = std::numeric_limits<float>::min()/10;
+            b[from] = -std::numeric_limits<float>::max()/2.f;
             for (int k = from; k != onetree.first_node; k = to) {
                 to = onetree.dad[k];
                 b[to] = std::max(b[k], d_ij(coords, pi, k, to));
@@ -24,6 +24,8 @@ std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>&
         }
         for (int j = 0; j < n; ++j) {
             to = onetree.topo[j];
+            if (to == from)
+                continue;
             if (from == onetree.first_node) {
                 alpha[from][to] = (to == onetree.dad[from]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[from];
             } else if (to == onetree.first_node) {
@@ -34,7 +36,7 @@ std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>&
                 }
                 alpha[from][to] = d_ij(coords, pi, to, from) - b[to];
                 if (alpha[from][to] < 0) {
-                    std::cout << from << " " << to << " dij " << d_ij(coords, pi, to, from) << " bto " << b[to] << std::endl;
+                    std::cout <<"VIRHE: "<< from << " " << to << " dij " << d_ij(coords, pi, to, from) << " bto " << b[to] << " pi " << pi[from] << " " << pi[to] << " " << distance(coords, to, from)  << std::endl;
                 }
             }
         }

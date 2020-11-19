@@ -161,22 +161,43 @@ std::pair<std::vector<std::vector<float>>, std::vector<int>> shuffle_alpha_id(st
     return {shuffled, shuffled_id};
 }
 
+std::vector<int> calculate_allowed_alpha_gpu(std::vector<std::vector<float>>& alpha, const int MAX_EDGES) {
+    int n = alpha.size();
+    std::vector<std::vector<std::pair<float, int>>> tmp(n);
+    std::vector<int> allowed(n);
+    //std::cout << "ALPHA GPU\n";
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            //std::cout << alpha[i][j] << " ";
+            if (i != j)
+                tmp[i].push_back({alpha[i][j], j});
+        }
+        //std::cout << std::endl;
+        std::sort(tmp[i].begin(), tmp[i].end());
+        for (int j = 0; j < MAX_EDGES; ++j)
+            allowed.push_back(tmp[i][j].second);
+    }
+    //std::cout << std::endl;
+    return allowed;
+}
+
 void solve_instance_gpu_alpha(std::vector<std::vector<float>> coords) {
     int permutations = 100;
     int n = coords[0].size();
     float best = std::numeric_limits<float>::max();
     std::vector<std::vector<float>> best_coords;
 
-    auto pi = gpu_subgradient_opt_alpha(coords[0].data(), coords[1].data(), n);
-
+    //auto pi = gpu_subgradient_opt_alpha(coords[0].data(), coords[1].data(), n);
+    auto pi = subgradient_opt_alpha(coords);
     auto onetree = prim_onetree_edges(coords, pi);
-
     auto alpha = calculate_alpha(coords, pi, onetree);
+    const int MAX_EDGES = std::min(5, n-1);
+    auto allowed = calculate_allowed_alpha_gpu(alpha, MAX_EDGES);
     Timer timer;
     timer.start();
     while(permutations--) {
-        auto shuffled_coords = shuffle_alpha(coords, alpha, std::min(n-1, 5));
-        run_gpu_2opt(shuffled_coords[0].data(), shuffled_coords[1].data(), n);
+        auto [shuffled_coords, shuffled_id] = shuffle_alpha_id(coords, alpha, std::min(n-1, 5));
+        run_gpu_2opt_restricted(shuffled_coords[0].data(), shuffled_coords[1].data(), shuffled_id.data(), allowed.data(), n, MAX_EDGES);
         float new_cost = cost(shuffled_coords);
         if (new_cost < best) {
             best = new_cost;
@@ -192,19 +213,19 @@ std::vector<std::vector<int>> calculate_allowed_alpha(std::vector<std::vector<fl
     int n = alpha.size();
     std::vector<std::vector<std::pair<float, int>>> tmp(n);
     std::vector<std::vector<int>> allowed(n);
-    std::cout << "ALPHA\n";
+    //std::cout << "ALPHA\n";
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
-            std::cout << alpha[i][j] << " ";
+            //std::cout << alpha[i][j] << " ";
             if (i != j)
                 tmp[i].push_back({alpha[i][j], j});
         }
-        std::cout << std::endl;
+        //std::cout << std::endl;
         std::sort(tmp[i].begin(), tmp[i].end());
         for (int j = 0; j < MAX_EDGES; ++j)
             allowed[i].push_back(tmp[i][j].second);
     }
-    std::cout << std::endl;
+    //std::cout << std::endl;
     return allowed;
 }
 
@@ -215,9 +236,10 @@ void solve_instance_cpu_alpha(std::vector<std::vector<float>> coords) {
     std::vector<std::vector<float>> best_coords;
 
     auto pi = subgradient_opt_alpha(coords);
+    std::vector<float> zpi(n, 0);
     auto onetree = prim_onetree_edges(coords, pi);
     auto alpha = calculate_alpha(coords, pi, onetree);
-    const int MAX_EDGES = std::min(10, n-1);
+    const int MAX_EDGES = std::min(5, n-1);
     auto allowed = calculate_allowed_alpha(alpha, MAX_EDGES);
     Timer timer;
     timer.start();
@@ -393,7 +415,7 @@ int main(int argc, char** argv) {
     }
     std::cout << std::endl;
     
-    //solve_instance_gpu_alpha(p);
+    solve_instance_gpu_alpha(p);
     solve_instance_cpu_alpha(p);
     //solve_instance_gpu_shortest(p);
     solve_instance_cpu_shortest(p);

@@ -258,6 +258,7 @@ void run_gpu_2opt_restricted(float* x, float* y, int* id, int* moves, int n, int
     cudaMemcpy(x, xGPU, n * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(y, yGPU, n * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(id, Gid, n * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
     cudaFree(xGPU);
     cudaFree(yGPU);
     cudaFree(bestGPU);
