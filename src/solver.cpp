@@ -192,15 +192,19 @@ std::vector<std::vector<int>> calculate_allowed_alpha(std::vector<std::vector<fl
     int n = alpha.size();
     std::vector<std::vector<std::pair<float, int>>> tmp(n);
     std::vector<std::vector<int>> allowed(n);
+    std::cout << "ALPHA\n";
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
+            std::cout << alpha[i][j] << " ";
             if (i != j)
                 tmp[i].push_back({alpha[i][j], j});
         }
+        std::cout << std::endl;
         std::sort(tmp[i].begin(), tmp[i].end());
         for (int j = 0; j < MAX_EDGES; ++j)
             allowed[i].push_back(tmp[i][j].second);
-    } 
+    }
+    std::cout << std::endl;
     return allowed;
 }
 
@@ -211,11 +215,9 @@ void solve_instance_cpu_alpha(std::vector<std::vector<float>> coords) {
     std::vector<std::vector<float>> best_coords;
 
     auto pi = subgradient_opt_alpha(coords);
-    auto zp = std::vector<float>(n, 0);
-    auto onetree = prim_onetree_edges(coords, zp);
-
+    auto onetree = prim_onetree_edges(coords, pi);
     auto alpha = calculate_alpha(coords, pi, onetree);
-    const int MAX_EDGES = std::min(40, n-1);
+    const int MAX_EDGES = std::min(10, n-1);
     auto allowed = calculate_allowed_alpha(alpha, MAX_EDGES);
     Timer timer;
     timer.start();
@@ -392,7 +394,7 @@ int main(int argc, char** argv) {
     std::cout << std::endl;
     
     //solve_instance_gpu_alpha(p);
-    //solve_instance_cpu_alpha(p);
+    solve_instance_cpu_alpha(p);
     //solve_instance_gpu_shortest(p);
     solve_instance_cpu_shortest(p);
     solve_instance_gpu_random(p);

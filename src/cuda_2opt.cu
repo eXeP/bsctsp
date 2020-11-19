@@ -165,7 +165,7 @@ __global__ void id_map_calculate(int* id, int* id_map) {
 
 __global__ void two_opt_kernel_restricted(const float* x, const float* y, const int* moves, const int* id, const int* id_map, best_struct* return_best, int n, const int allowed_moves, int* lock) {
     int i = blockIdx.x;
-    int* i_moves = moves + i * allowed_moves;
+    const int* i_moves = moves + i * allowed_moves;
     float best = 0;
     int best_j = 0;
     if (i > 0) {
@@ -225,7 +225,7 @@ void run_gpu_2opt_restricted(float* x, float* y, int* id, int* moves, int n, int
 
     int* Gid_map = NULL;
     cudaMalloc((void**)&Gid_map, n * sizeof(int));
-    cudaMemcpy(Gid_map, id_map, n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(Gid_map, id_map.data(), n * sizeof(float), cudaMemcpyHostToDevice);
 
     dim3 dimBlock(64, 1);
     dim3 dimGrid(divup(n, 64), divup(n, 64));

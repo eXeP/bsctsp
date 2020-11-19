@@ -7,6 +7,8 @@ struct one_tree {
     std::vector<std::vector<int>> edges;
     std::vector<int> dad;
     std::vector<int> topo;
+    std::vector<float> next_best;
+    int first_node;
 };
 
 std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>& coords, std::vector<float>& pi, one_tree& onetree);

@@ -67,7 +67,7 @@ std::tuple<std::vector<float>, std::vector<float>, std::vector<int>> two_opt_bes
     int best_i = 0, best_j = 0;
     while (true) {
         best = 0.f; best_i = 0; best_j = 0;
-        //#pragma omp parallel for schedule(static,1)
+        #pragma omp parallel for schedule(static,1)
         for (int i = 1; i < n-2; ++i) {
             int id_i = id[i];
             for (auto id_j : allowed[id_i]) {

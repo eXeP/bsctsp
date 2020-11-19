@@ -7,51 +7,31 @@
 
 std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>& coords, std::vector<float>& pi, one_tree& onetree) {
     int n = coords[0].size();
-    std::vector<std::vector<float>> alpha = std::vector<std::vector<float>>(n, std::vector<float>(n, 0));
-
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            if (i == j) 
-                alpha[i][j] = std::numeric_limits<float>::max();
-            //Case (a) in paper
-            for (auto f : onetree.edges[i]) {
-                if (f == j) {
-                    alpha[i][j] = 0.0f;
-                    goto next_j;
-                }
-            }
-            //Case (b) in paper
-            if (i == 0 || j == 0) {
-                float one_max_edge = 0.0f;
-                for (auto f : onetree.edges[0]) {
-                    one_max_edge = std::max(one_max_edge, d_ij(coords, pi, 0, f));
-                }
-                alpha[i][j] = d_ij(coords, pi, i, j) - one_max_edge;
-                goto next_j;
-            }
-        }
-        next_j:
-        1==1;
-    }
-    std::vector<int> mark = std::vector<int>(n);
+    std::vector<std::vector<float>> alpha = std::vector<std::vector<float>>(n, std::vector<float>(n, std::numeric_limits<float>::max()));
+    std::vector<int> mark = std::vector<int>(n, 0);
     std::vector<float> b = std::vector<float>(n);
-    for (int i = 1; i < n; ++i)
-        mark[i] = 0;
-    for (int i = 1; i < n; ++i) {
-        int node_id = onetree.topo[i-1];
-        b[node_id] = std::numeric_limits<float>::min();
-        int j = 0;
-        for (int k = node_id; k != onetree.topo[0]; k = j) {
-            j = onetree.dad[k];
-            b[j] = std::max(b[k], d_ij(coords, pi, k, j));
-            mark[j] = node_id;
+    for (int from = 0; from < n; ++from) {
+        int to = 0;
+        if (from != onetree.first_node) {
+            b[from] = std::numeric_limits<float>::min();
+            for (int k = from; k != -1; k = to) {
+                to = onetree.dad[k];
+                if (to == -1)
+                    continue;
+                b[to] = std::max(b[k], d_ij(coords, pi, k, to));
+                mark[to] = from;
+            }
         }
-        for (j = 1; j < n; ++j) {
-            if (j != node_id) {
-                if (mark[j] != node_id) {
-                    b[j] = std::max(b[onetree.dad[j]], d_ij(coords, pi, j, onetree.dad[j]));
-                    alpha[node_id][j] = d_ij(coords, pi, j, node_id) - b[j];
+        for (to = 0; to < n; ++to) {
+            if (from == onetree.first_node) {
+                alpha[from][to] = (to == onetree.dad[from]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[from];
+            } else if (to == onetree.first_node) {
+                alpha[from][to] = (to == onetree.dad[to]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[to];
+            } else {
+                if (mark[to] != from) {
+                    b[to] = std::max(b[onetree.dad[to]], d_ij(coords, pi, to, onetree.dad[to]));
                 }
+                alpha[from][to] = d_ij(coords, pi, to, from) - b[to];
             }
         }
     }
@@ -70,15 +50,15 @@ one_tree prim_onetree_edges(std::vector<std::vector<float>>& p, std::vector<floa
     };
     std::vector<bool> picked = std::vector<bool>(n, false);
     std::vector<std::pair<float, int>> value = std::vector<std::pair<float, int>>(n, {std::numeric_limits<float>::max(), -1});
-    int excluded_vertex = 0;
-    int start_vertex = (excluded_vertex+1)%n;
+    int start_vertex = rand()%n;
     value[start_vertex] = {0, start_vertex};
     std::set<std::pair<float, int>> pq;
     pq.insert({0, start_vertex});
     float length = 0;
     std::vector<int> degrees(n);
     std::vector<std::vector<int>> edges(n, std::vector<int>());
-    std::vector<int> topo, dad(n);
+    std::vector<int> topo, dad(n, -1);
+    std::vector<float> next_best(n);
     while (!pq.empty()) {
         auto [current_value, current_vertex] = *pq.begin();
         pq.erase(pq.begin());
@@ -96,7 +76,7 @@ one_tree prim_onetree_edges(std::vector<std::vector<float>>& p, std::vector<floa
         topo.push_back(current_vertex);
         picked[current_vertex] = true;
         for (int i = 0; i < n; ++i) {
-            if (i == current_vertex || picked[i] || i == excluded_vertex)
+            if (i == current_vertex || picked[i])
                 continue;
             float new_len = c(i, current_vertex);
             if (new_len < value[i].first) {
@@ -109,26 +89,27 @@ one_tree prim_onetree_edges(std::vector<std::vector<float>>& p, std::vector<floa
             
         }
     }
-    std::pair<int, float> edge_lens[2] = {{-1, std::numeric_limits<float>::max()}, {-1, std::numeric_limits<float>::max()}};
+    int best_i = 0, best_j = 0;
+    float second_longest = std::numeric_limits<float>::min();
     for (int i = 0; i < n; ++i) {
-        if (i == excluded_vertex)
-            continue;
-        float len = c(excluded_vertex, i);
-        if (len < edge_lens[1].second && len < edge_lens[0].second) {
-            edge_lens[1] = edge_lens[0];
-            edge_lens[0] = {i, len};
-        } else if (len < edge_lens[1].second) {
-            edge_lens[1] = {i, len};
+        if (degrees[i] == 1 && dad[i] != -1) {
+            std::vector<std::pair<float, int>> lens;
+            for (int j = 0; j < n; ++j) {
+                if (i != j)
+                    lens.push_back({c(i, j), j});
+            }
+            std::sort(lens.begin(), lens.end());
+            next_best[i] = second_longest;
+            if (lens[1].first > second_longest) {
+                best_i = i;
+                best_j = lens[1].second;
+                second_longest = lens[1].first;
+            }
         }
     }
-    edges[excluded_vertex].push_back(edge_lens[0].first);
-    edges[value[edge_lens[0].first].second].push_back(excluded_vertex);
-    edges[excluded_vertex].push_back(edge_lens[1].first);
-    edges[value[edge_lens[1].first].second].push_back(excluded_vertex);
-    length += edge_lens[0].second + edge_lens[1].second;
-    degrees[edge_lens[0].first]++;
-    degrees[edge_lens[1].first]++;
-    degrees[excluded_vertex] += 2;
+    length += second_longest;
+    degrees[best_i]++;
+    degrees[best_j]++;
 
     one_tree onetree;
     onetree.length = length;
@@ -136,6 +117,8 @@ one_tree prim_onetree_edges(std::vector<std::vector<float>>& p, std::vector<floa
     onetree.edges = edges;
     onetree.dad = dad;
     onetree.topo = topo;
+    onetree.first_node = start_vertex;
+    onetree.next_best = next_best;
 
     return onetree;
 }
@@ -152,14 +135,13 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
     };
     std::vector<bool> picked = std::vector<bool>(n, false);
     std::vector<std::pair<float, int>> value = std::vector<std::pair<float, int>>(n, {std::numeric_limits<float>::max(), -1});
-    int excluded_vertex = 0;
-    int start_vertex = (excluded_vertex+1)%n;
+    int start_vertex = rand()%n;
     value[start_vertex] = {0, start_vertex};
     std::set<std::pair<float, int>> pq;
     pq.insert({0, start_vertex});
     float length = 0;
     std::vector<int> degrees(n);
-   
+   std::vector<int> dad(n, -1);
     while (!pq.empty()) {
         auto [current_value, current_vertex] = *pq.begin();
         pq.erase(pq.begin());
@@ -167,13 +149,14 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
             continue;
         }
         if (current_vertex != value[current_vertex].second) {
+            dad[current_vertex] = value[current_vertex].second;
             degrees[current_vertex]++;
             degrees[value[current_vertex].second]++;
             length += value[current_vertex].first;
         }
         picked[current_vertex] = true;
         for (int i = 0; i < n; ++i) {
-            if (i == current_vertex || picked[i] || i == excluded_vertex)
+            if (i == current_vertex || picked[i])
                 continue;
             float new_len = c(i, current_vertex);
             if (new_len < value[i].first) {
@@ -186,22 +169,26 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
             
         }
     }
-    std::pair<int, float> edge_lens[2] = {{-1, std::numeric_limits<float>::max()}, {-1, std::numeric_limits<float>::max()}};
+    int best_i = 0, best_j = 0;
+    float second_longest = std::numeric_limits<float>::min();
     for (int i = 0; i < n; ++i) {
-        if (i == excluded_vertex)
-            continue;
-        float len = c(excluded_vertex, i);
-        if (len < edge_lens[1].second && len < edge_lens[0].second) {
-            edge_lens[1] = edge_lens[0];
-            edge_lens[0] = {i, len};
-        } else if (len < edge_lens[1].second) {
-            edge_lens[1] = {i, len};
+        if (degrees[i] == 1 && dad[i] != -1) {
+            std::vector<std::pair<float, int>> lens;
+            for (int j = 0; j < n; ++j) {
+                if (i != j)
+                    lens.push_back({c(i, j), j});
+            }
+            std::sort(lens.begin(), lens.end());
+            if (lens[1].first > second_longest) {
+                best_i = i;
+                best_j = lens[1].second;
+                second_longest = lens[1].first;
+            }
         }
     }
-    length += edge_lens[0].second + edge_lens[1].second;
-    degrees[edge_lens[0].first]++;
-    degrees[edge_lens[1].first]++;
-    degrees[excluded_vertex] += 2;
+    length += second_longest;
+    degrees[best_i]++;
+    degrees[best_j]++;
     return {length, degrees};
 }
 
