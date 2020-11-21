@@ -1,5 +1,9 @@
 #include <vector>
 #include <iostream>
+#include <limits>
+#include <algorithm> 
+#include <iomanip>
+
 
 #include "cuda_2opt.cuh"
 #include "2opt.h"
@@ -35,7 +39,7 @@ int cost(std::vector<std::vector<float>>& coords) {
     int n = coords[0].size();
     float c = 0;
     for (int i = 0; i < n; ++i) {
-        c += distance(coords, i, (i+1)%n);
+        c += sqrdistance(coords, i, (i+1)%n);
     }
     return c;
 }
@@ -191,7 +195,7 @@ void solve_instance_gpu_alpha(std::vector<std::vector<float>> coords) {
     auto pi = subgradient_opt_alpha(coords);
     auto onetree = prim_onetree_edges(coords, pi);
     auto alpha = calculate_alpha(coords, pi, onetree);
-    const int MAX_EDGES = std::min(5, n-1);
+    const int MAX_EDGES = std::min(10, n-1);
     auto allowed = calculate_allowed_alpha_gpu(alpha, MAX_EDGES);
     Timer timer;
     timer.start();
@@ -234,17 +238,26 @@ void solve_instance_cpu_alpha(std::vector<std::vector<float>> coords) {
     int n = coords[0].size();
     float best = std::numeric_limits<float>::max();
     std::vector<std::vector<float>> best_coords;
-
+    Timer timer;
+    timer.start();
     auto pi = subgradient_opt_alpha(coords);
     std::vector<float> zpi(n, 0);
     auto onetree = prim_onetree_edges(coords, pi);
     auto alpha = calculate_alpha(coords, pi, onetree);
-    const int MAX_EDGES = std::min(5, n-1);
+    //auto exact_alpha = calculate_exact_alpha(coords, pi);
+    //for (int i = 0; i < n; ++i) {
+    //    for (int j = 0; j < n; ++j) {
+    //        std::cout << i << ", " << j << ": " << alpha[i][j] << " vs " << exact_alpha[i][j] << std::endl;
+    //    }
+    //}
+    const int MAX_EDGES = std::min(10, n-1);
     auto allowed = calculate_allowed_alpha(alpha, MAX_EDGES);
-    Timer timer;
+    timer.stop();
+    std::cout << "Preprocessing took " << timer.elapsedMilliseconds() << std::endl;
+
     timer.start();
     while(permutations--) {
-        auto [shuffled_coords, shuffled_id] = shuffle_alpha_id(coords, alpha, std::min(n-1, 5));
+        auto [shuffled_coords, shuffled_id] = shuffle_alpha_id(coords, alpha, std::min(n-1, 20));
         auto [x, y, id] = two_opt_best_restricted(shuffled_coords[0], shuffled_coords[1], shuffled_id, allowed);
         shuffled_coords[0] = x;
         shuffled_coords[1] = y;
@@ -327,14 +340,15 @@ std::vector<std::vector<int>> calculate_allowed_shortest(std::vector<std::vector
 void solve_instance_cpu_shortest(std::vector<std::vector<float>> coords) {
     int permutations = 1;
     int n = coords[0].size();
+    Timer timer;
+    timer.start();
     std::vector<int> id(n);
     for (int i = 0; i < n; ++i)
         id[i] = i;
     float best = std::numeric_limits<float>::max();
     std::vector<std::vector<float>> best_coords;
-    auto allowed = calculate_allowed_shortest(coords, std::min(40, n-1));
-    Timer timer;
-    timer.start();
+    auto allowed = calculate_allowed_shortest(coords, std::min(10, n-1));
+    
     while(permutations--) {
         shuffle_id(coords, id);
         auto [x, y, id2] = two_opt_best_restricted(coords[0], coords[1], id, allowed);
@@ -399,23 +413,13 @@ void solve_instance_cpu_random(std::vector<std::vector<float>> coords) {
 
 int main(int argc, char** argv) {
     std::cout << std::setprecision(10);
-    int seed = 42;
+    int seed = 43;
     std::srand(seed);
     int n = std::stoi(argv[1]);
     
-    const int NDIM = 2;
-    
-    std::vector<std::vector<float>> p(2);
-    
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < NDIM; ++j) {
-            p[j].push_back(rand()%2000+rand01());
-            std::cout << p[j].back() << " ";
-        }
-    }
-    std::cout << std::endl;
-    
-    solve_instance_gpu_alpha(p);
+    auto p = read_graph("pr1002");
+    //auto p = random_graph(10);
+    //solve_instance_gpu_alpha(p);
     solve_instance_cpu_alpha(p);
     //solve_instance_gpu_shortest(p);
     solve_instance_cpu_shortest(p);

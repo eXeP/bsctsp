@@ -287,7 +287,6 @@ std::pair<float, std::vector<int>> gpu_boruvka_onetree(int n, float* Gx, float* 
 }
 
 std::vector<float> gpu_subgradient_opt_alpha(float* x, float* y, int n) {
-    printf("\n----Subgradient opt. for alpha-nearness on GPU----\n");
     float* Gpi = NULL;
     cudaMalloc((void**)&Gpi, n * sizeof(float));
     cudaMemset(Gpi, 0, n*sizeof(float));

@@ -1,5 +1,8 @@
 #include "util.h"
 
+#include <string>
+#include <iostream>
+#include <fstream>
 
 std::vector<std::vector<float>> read_graph(char* tsp_name) {
     std::string tsp_file_name = "tsplib/" + std::string(tsp_name) + ".tsp";
@@ -9,7 +12,7 @@ std::vector<std::vector<float>> read_graph(char* tsp_name) {
     std::getline(tsp_file, sink);
     std::getline(tsp_file, sink);
     std::getline(tsp_file, sink);
-    tsp_file >> sink >> dimension;
+    tsp_file >> sink >> sink >> dimension;
     std::getline(tsp_file, sink);
     std::getline(tsp_file, sink);
     std::getline(tsp_file, sink);
@@ -21,7 +24,7 @@ std::vector<std::vector<float>> read_graph(char* tsp_name) {
         int id, x, y;
         tsp_file >> id >> x >> y;
         coords[0].push_back(x);
-        coords[1].push_back(x);
+        coords[1].push_back(y);
     }
     return coords;
 }

@@ -1,6 +1,7 @@
 #include "2opt.h"
-
 #include "util.h"
+
+#include <algorithm>
 
 void swap_2opt_arr(std::vector<float>& t, int i, int j) {
     std::reverse(t.begin()+i, t.begin()+j+1);
@@ -69,21 +70,25 @@ std::tuple<std::vector<float>, std::vector<float>, std::vector<int>> two_opt_bes
         best = 0.f; best_i = 0; best_j = 0;
         #pragma omp parallel for schedule(static,1)
         for (int i = 1; i < n-2; ++i) {
-            int id_i = id[i];
-            for (auto id_j : allowed[id_i]) {
+            for (auto id_j : allowed[id[i-1]]) {
                 int j = id_map[id_j];
                 //std::cout << "kokeillaan " << i << ", " << j  << " " << dist(i, j)<< std::endl;
                 if (j == n-1 || j == 0)
                     continue;
-                float new_impr = g(std::min(i, j), std::max(i, j));
-                //std::cout << "oli " << i << ", " << j << ": " << new_impr << std::endl;
-                if (new_impr > best) {
-                    #pragma omp critical 
-                    {
+                int jp = id_map[j+1];
+                for (auto id_jp : allowed[id[i]]) {
+                    if (jp == id_jp) {
+                        float new_impr = g(std::min(i, j), std::max(i, j));
+                        //std::cout << "oli " << i << ", " << j << ": " << new_impr << std::endl;
                         if (new_impr > best) {
-                            best = new_impr;
-                            best_i = std::min(i, j);
-                            best_j = std::max(i, j);
+                            #pragma omp critical 
+                            {
+                                if (new_impr > best) {
+                                    best = new_impr;
+                                    best_i = std::min(i, j);
+                                    best_j = std::max(i, j);
+                                }
+                            }
                         }
                     }
                 }

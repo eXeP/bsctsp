@@ -1,12 +1,33 @@
 #pragma once
 
-#include <bits/stdc++.h>
+#include <vector>
+#include <math.h> 
+
 
 static inline float rand01(){
     return ((float) rand() / (RAND_MAX));
 }
 
 std::vector<std::vector<float>> read_graph(char* tsp_name);
+
+static inline float sqrdistance(std::vector<std::vector<float>>& coords, int i, int j) {
+    float d = 0;
+    for (int k = 0; k < coords.size(); ++k) {
+        d += (coords[k][i] - coords[k][j]) * (coords[k][i] - coords[k][j]);
+    }
+    return std::sqrt(d);
+}
+
+static inline std::vector<std::vector<float>> random_graph(int n) {
+    const int NDIM = 2;
+    std::vector<std::vector<float>> p(2);
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < NDIM; ++j) {
+            p[j].push_back(rand()%2000+rand01());
+        }
+    }
+    return p;
+}
 
 static inline float distance(std::vector<std::vector<float>>& coords, int i, int j) {
     float d = 0;
