@@ -160,6 +160,7 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
             degrees[current_vertex]++;
             degrees[value[current_vertex].second]++;
             length += value[current_vertex].first;
+            //std::cout << "e " << std::min(current_vertex, value[current_vertex].second) << "-" << std::max(current_vertex, value[current_vertex].second) << " " << value[current_vertex].first << std::endl;
         }
         picked[current_vertex] = true;
         for (int i = 0; i < n; ++i) {
@@ -179,7 +180,7 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
     int best_i = 0, best_j = 0;
     float second_longest = std::numeric_limits<float>::min();
     for (int i = 0; i < n; ++i) {
-        if (degrees[i] == 1 && dad[i] != -1) {
+        if (degrees[i] == 1) {
             std::vector<std::pair<float, int>> lens;
             for (int j = 0; j < n; ++j) {
                 if (i != j)
@@ -193,6 +194,7 @@ std::pair<float, std::vector<int>> prim_onetree(std::vector<std::vector<float>>&
             }
         }
     }
+    //std::cout << "s " << std::min(best_i, best_j) << "-" << std::max(best_i, best_j) << " " << second_longest << std::endl;
     length += second_longest;
     degrees[best_i]++;
     degrees[best_j]++;
@@ -218,7 +220,9 @@ std::vector<float> subgradient_opt_alpha(std::vector<std::vector<float>>& coord)
         for (int p = 1; t > 0 && p <= period; ++p) {
             for (int i = 0; i < n; ++i) {
                 pi[i] += t * ( 0.7f * v[i] + 0.3f * last_v[i]);
+            //std::cout << pi[i] << " ";
             }
+            //std::cout << std::endl;
             last_v = v;
             auto [w, d] = prim_onetree(coord, pi);
             for (int i = 0; i < n; ++i)
@@ -228,6 +232,7 @@ std::vector<float> subgradient_opt_alpha(std::vector<std::vector<float>>& coord)
                 v[i] = d[i] - 2;
                 is_tour &= (v[i] == 0);
             }
+            //printf("opt %.3f %.3f %.3f %d %d\n", w, best_w, t, p, period, initial_period);
             if (w > best_w) {
                 best_w = w;
                 best_pi = pi;

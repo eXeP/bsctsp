@@ -74,7 +74,7 @@ std::tuple<std::vector<float>, std::vector<float>, std::vector<int>> two_opt_bes
             for (auto id_j : allowed[id[i-1]]) {
                 int j = id_map[id_j];
                 //std::cout << "kokeillaan " << i << ", " << j  << " " << dist(i, j)<< std::endl;
-                if (j == n-1 || j == 0)
+                if (j == n-1 || j == 0 || j <= i)
                     continue;
                 int jp = id_map[j+1];
                 for (auto id_jp : allowed[id[i]]) {
@@ -95,7 +95,7 @@ std::tuple<std::vector<float>, std::vector<float>, std::vector<int>> two_opt_bes
                 }
             }
         }
-        std::cout << "Improvement " << best << " " << best_i << " " << best_j << std::endl;
+        //std::cout << "Improvement " << best << " " << best_i << " " << best_j << std::endl;
         if (best == 0.f)
             break;
         

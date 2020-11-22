@@ -58,7 +58,7 @@ std::pair<std::vector<std::vector<float>>, std::vector<int>> initial_tour_alpha(
         initial_coords[1].push_back(coords[1][i]);
         initial_id.push_back(i);
         picked[i] = true;
-        std::cout << i << " ";
+        //std::cout << i << " ";
     };
     
     int start = rand()%n;
@@ -71,7 +71,7 @@ std::pair<std::vector<std::vector<float>>, std::vector<int>> initial_tour_alpha(
             }
         }
     }
-    std::cout << std::endl;
+    //std::cout << std::endl;
     return {initial_coords, initial_id};
 }
 
@@ -94,7 +94,7 @@ std::vector<int> calculate_allowed_alpha_gpu(std::vector<std::vector<float>>& al
 
 
 void solve_instance_gpu_alpha(std::vector<std::vector<float>> coords) {
-    int permutations = 1;
+    int permutations = 100;
     int n = coords[0].size();
     float best = std::numeric_limits<float>::max();
     std::vector<std::vector<float>> best_coords;
@@ -103,12 +103,12 @@ void solve_instance_gpu_alpha(std::vector<std::vector<float>> coords) {
     auto pi = gpu_subgradient_opt_alpha(coords[0].data(), coords[1].data(), n);
     auto onetree = prim_onetree_edges(coords, pi);
     auto alpha = calculate_alpha(coords, pi, onetree);
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j)
-            std::cout << alpha[i][j] << " "; 
-        std::cout << std::endl;
-    }
-    const int MAX_EDGES = std::min(10, n-1);
+    //for (int i = 0; i < n; ++i) {
+    //    for (int j = 0; j < n; ++j)
+    //        std::cout << alpha[i][j] << " "; 
+    //    std::cout << std::endl;
+    //}
+    const int MAX_EDGES = std::min(80, n-1);
     auto allowed = calculate_allowed_alpha_gpu(alpha, MAX_EDGES);
     timer.stop();
     std::cout << "GPU alpha preprocessing took " << timer.elapsedMilliseconds() << std::endl;
@@ -146,7 +146,7 @@ std::vector<std::vector<int>> calculate_allowed_alpha(std::vector<std::vector<fl
 
 
 void solve_instance_cpu_alpha(std::vector<std::vector<float>> coords) {
-    int permutations = 1;
+    int permutations = 100;
     int n = coords[0].size();
     float best = std::numeric_limits<float>::max();
     std::vector<std::vector<float>> best_coords;
@@ -155,11 +155,11 @@ void solve_instance_cpu_alpha(std::vector<std::vector<float>> coords) {
     auto pi = subgradient_opt_alpha(coords);
     auto onetree = prim_onetree_edges(coords, pi);
     auto alpha = calculate_alpha(coords, pi, onetree);
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j)
-            std::cout << alpha[i][j] << " "; 
-        std::cout << std::endl;
-    }
+    //for (int i = 0; i < n; ++i) {
+    //    for (int j = 0; j < n; ++j)
+    //        std::cout << alpha[i][j] << " "; 
+    //    std::cout << std::endl;
+    //}
     const int MAX_EDGES = std::min(80, n-1);
     auto allowed = calculate_allowed_alpha(alpha, MAX_EDGES);
     timer.stop();

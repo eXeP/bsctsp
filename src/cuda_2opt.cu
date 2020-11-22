@@ -178,30 +178,30 @@ __global__ void two_opt_kernel_restricted(const float* x, const float* y, const 
         for (int k = 0; k < allowed_moves; ++k) {
             int id_j = i_prev_moves[k];
             int j = id_map[id_j];
-            if (j != 0 && j != n-1) {
-                int jp = id_map[j+1];
+            if (j != 0 && j != n-1 && j > i) {
+                int jp = id[j+1];
                 for (int k2 = 0; k2 < allowed_moves; ++k2) {
                     int id_jp = i_moves[k2];
                     if (jp == id_jp) {
                         float k_dist = i_dist + dist(x[j], y[j], x[j+1], y[j+1]) - 
                         (dist(xi, yi, x[j+1], y[j+1]) + dist(xim, yim, x[j], y[j]));
-                        //printf("sis %d %d %f\n", i, j, k_dist);
+                        //printf("sis %d %d %d %d %f\n", i, j, id_i, jp, k_dist);
                         if (k_dist > best) {
                             best = k_dist;
-                            best_j = j+k;
+                            best_j = j;
                         }
                     }
                 }
             }
         }
     }
-
+    //printf("%d parasa %.3f\n", i, best);
     if (best > return_best[0].best) {
-        while (atomicExch(&lock[0], 1) != 0 && best > return_best[0].best);
+        while (atomicExch(&lock[0], 1) != 0);
         if (best > return_best[0].best) {
             return_best[0].best = best;
-            return_best[0].i = i;
-            return_best[0].j = best_j;
+            return_best[0].i = min(i, best_j);
+            return_best[0].j = max(i, best_j);
         }
         lock[0] = 0;
     }
@@ -235,8 +235,8 @@ void run_gpu_2opt_restricted(float* x, float* y, int* id, int* moves, int n, int
     cudaMalloc((void**)&Gid_map, n * sizeof(int));
     cudaMemcpy(Gid_map, id_map.data(), n * sizeof(float), cudaMemcpyHostToDevice);
 
-    dim3 dimBlock(64, 1);
-    dim3 dimGrid(divup(n, 64), divup(n, 64));
+    dim3 dimBlock(1, 1);
+    dim3 dimGrid(n, 1);
     do {
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
@@ -252,7 +252,7 @@ void run_gpu_2opt_restricted(float* x, float* y, int* id, int* moves, int n, int
         best_struct* best = (best_struct*)malloc(sizeof(best_struct));
         cudaMemcpy(best, bestGPU, sizeof(best_struct), cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize();
-        printf("Improvement %f %d %d\n", best[0].best, best[0].i, best[0].j);
+        //printf("Improvement %f %d %d\n", best[0].best, best[0].i, best[0].j);
         fflush(stdout);
         if (abs(best[0].best) < 0.000001)
             break;
