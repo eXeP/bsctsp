@@ -164,28 +164,32 @@ __global__ void id_map_calculate(int* id, int* id_map) {
 }
 
 __global__ void two_opt_kernel_restricted(const float* x, const float* y, const int* moves, const int* id, const int* id_map, best_struct* return_best, int n, const int allowed_moves, int* lock) {
-    int i = blockIdx.x;
+    int i = blockIdx.x * 64 + threadIdx.x;
     float best = 0;
     int best_j = 0;
-    if (i > 0) {
+    __shared__ float shared_best[64];
+    __shared__ int shared_best_j[64];
+    shared_best[threadIdx.x] = 0;
+    shared_best_j[threadIdx.x] = 0;
+    if (i > 0 && i < n) {
         int id_i = id[i];
         int id_i_prev = id[i-1];
         const int* i_prev_moves = moves + id_i_prev * allowed_moves;
         const int* i_moves = moves + id_i * allowed_moves;
         
+        float xi = x[i], xim = x[i-1], yi = y[i], yim = y[i-1];
+        float i_dist = dist(xi, yi, xim, yim);
         for (int k = 0; k < allowed_moves; ++k) {
             int id_j = i_prev_moves[k];
             int j = id_map[id_j];
-            if (j != 0 && j != n-1 && j != i-1) {
+            if (j != 0 && j != n-1 && j > i) {
                 int jp = id[j+1];
                 for (int k2 = 0; k2 < allowed_moves; ++k2) {
                     int id_jp = i_moves[k2];
                     if (jp == id_jp) {
-                        int i2 = min(i, j);
-                        int j2 = max(i, j);
-                        float k_dist = dist(x[i2], y[i2], x[i2-1], y[i2-1]) + dist(x[j2], y[j2], x[j2+1], y[j2+1]) - 
-                        (dist(x[i2], y[i2], x[j2+1], y[j2+1]) + dist(x[i2-1], y[i2-1], x[j2], y[j2]));
-                        //printf("sis %d %d %d %d %f\n", i, j, id_i, jp, k_dist);
+                        float k_dist = i_dist + dist(x[j], y[j], x[j+1], y[j+1]) - 
+                        (dist(xi, yi, x[j+1], y[j+1]) + dist(xim, yim, x[j], y[j]));
+                        //printf("sis %d %d %f\n", i, j, k_dist);
                         if (k_dist > best) {
                             best = k_dist;
                             best_j = j;
@@ -195,16 +199,30 @@ __global__ void two_opt_kernel_restricted(const float* x, const float* y, const 
             }
         }
     }
-    //printf("%d parasa %.3f\n", i, best);
-    if (best > return_best[0].best) {
-        while (atomicExch(&lock[0], 1) != 0);
-        if (best > return_best[0].best) {
-            return_best[0].best = best;
-            return_best[0].i = min(i, best_j);
-            return_best[0].j = max(i, best_j);
+    shared_best[threadIdx.x] = best;
+    shared_best_j[threadIdx.x] = best_j;
+
+    __syncthreads();
+    if (threadIdx.x == 0) {
+        int best_i = 0;
+        for (int k = 0; k < 64; ++k) {
+            if (shared_best[k] > best) {
+                best = shared_best[k];
+                best_j = shared_best_j[k];
+                best_i = i+k;
+            }
         }
-        lock[0] = 0;
+        if (best > return_best[0].best) {
+            while (atomicExch(&lock[0], 1) != 0);
+            if (best > return_best[0].best) {
+                return_best[0].best = best;
+                return_best[0].i = min(best_i, best_j);
+                return_best[0].j = max(best_i, best_j);
+            }
+            lock[0] = 0;
+        }
     }
+    
 }
 
 void run_gpu_2opt_restricted(float* x, float* y, int* id, int* moves, int n, int allowed_moves) {
@@ -235,8 +253,8 @@ void run_gpu_2opt_restricted(float* x, float* y, int* id, int* moves, int n, int
     cudaMalloc((void**)&Gid_map, n * sizeof(int));
     cudaMemcpy(Gid_map, id_map.data(), n * sizeof(float), cudaMemcpyHostToDevice);
 
-    dim3 dimBlock(1, 1);
-    dim3 dimGrid(n, 1);
+    dim3 dimBlock(64, 1);
+    dim3 dimGrid(divup(n, 64), 1);
     do {
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();

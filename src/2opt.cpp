@@ -74,9 +74,9 @@ std::tuple<std::vector<float>, std::vector<float>, std::vector<int>> two_opt_bes
             for (auto id_j : allowed[id[i-1]]) {
                 int j = id_map[id_j];
                 //std::cout << "kokeillaan " << i << ", " << j  << " " << dist(i, j)<< std::endl;
-                if (j == n-1 || j == 0 || j <= i)
+                if (j == n-1 || j == 0 || j == i-1)
                     continue;
-                int jp = id_map[j+1];
+                int jp = id[j+1];
                 for (auto id_jp : allowed[id[i]]) {
                     if (jp == id_jp) {
                         float new_impr = g(std::min(i, j), std::max(i, j));

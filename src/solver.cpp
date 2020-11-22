@@ -280,11 +280,11 @@ void solve_instance_cpu_random(std::vector<std::vector<float>> coords) {
 int main(int argc, char** argv) {
     std::cout << std::setprecision(10);
     int seed = 43;
-    std::srand(seed);
+    std::srand(time(nullptr));
 
-    //auto p = read_graph(argv[1]);
-    int n = std::stoi(argv[1]);
-    auto p = random_graph(n);
+    auto p = read_graph(argv[1]);
+    //int n = std::stoi(argv[1]);
+    //auto p = random_graph(n);
 
     solve_instance_gpu_alpha(p);
     solve_instance_cpu_alpha(p);
