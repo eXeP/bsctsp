@@ -2,6 +2,7 @@
 #include "util.h"
 
 #include <algorithm>
+#include <iostream>
 
 void swap_2opt_arr(std::vector<float>& t, int i, int j) {
     std::reverse(t.begin()+i, t.begin()+j+1);
@@ -94,9 +95,10 @@ std::tuple<std::vector<float>, std::vector<float>, std::vector<int>> two_opt_bes
                 }
             }
         }
+        std::cout << "Improvement " << best << " " << best_i << " " << best_j << std::endl;
         if (best == 0.f)
             break;
-        //std::cout << "Improvement " << best << " " << best_i << " " << best_j << std::endl;
+        
         swap_2opt_arr(x, best_i, best_j);
         swap_2opt_arr(y, best_i, best_j);
         swap_2opt_arr(id, best_i, best_j);

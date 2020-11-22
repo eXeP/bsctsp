@@ -16,7 +16,6 @@ std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>&
     std::vector<float> b = std::vector<float>(n);
     for (int i = 0; i < n; ++i) {
         int from = onetree.topo[i];
-        //std::cout << from  << " dad " <<  onetree.dad[from] << " eka " << onetree.first_node << std::endl;
         int to = 0;
         if (from != onetree.first_node) {
             b[from] = -std::numeric_limits<float>::max()/2.f;
@@ -39,14 +38,12 @@ std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>&
                     b[to] = std::max(b[onetree.dad[to]], d_ij(coords, pi, to, onetree.dad[to]));
                 }
                 alpha[from][to] = d_ij(coords, pi, to, from) - b[to];
-                if (alpha[from][to] < 0) {
-                    std::cout <<"VIRHE: "<< from << " " << to << " dij " << d_ij(coords, pi, to, from) << " bto " << b[to] << " pi " << pi[from] << " " << pi[to] << " " << distance(coords, to, from)  << std::endl;
-                }
             }
         }
     }
     return alpha;
 }
+
 
 
 
@@ -71,7 +68,6 @@ one_tree prim_onetree_edges_ij(std::vector<std::vector<float>>& p, std::vector<f
         else
             value[i] = {c(js, i), js};
     }
-    std::cout << "ij for " << is << "-" << js << " " << c(is, js) << std::endl;
     float length = c(is, js);
     picked[is] = true;
     picked[js] = true;
@@ -85,7 +81,6 @@ one_tree prim_onetree_edges_ij(std::vector<std::vector<float>>& p, std::vector<f
         if (picked[current_vertex]) {
             continue;
         }
-        std::cout << "ij lis " << current_vertex << "-" << value[current_vertex].second << " " << current_value << std::endl;
         if (current_vertex != value[current_vertex].second) {
             dad[current_vertex] = value[current_vertex].second;
             degrees[current_vertex]++;
@@ -128,7 +123,6 @@ one_tree prim_onetree_edges_ij(std::vector<std::vector<float>>& p, std::vector<f
             }
         }
     }
-    std::cout << "ij vika " << best_i << "-" << best_j << " " << second_longest << std::endl;
     length += second_longest;
     degrees[best_i]++;
     degrees[best_j]++;
@@ -185,7 +179,6 @@ one_tree prim_onetree_edges(std::vector<std::vector<float>>& p, std::vector<floa
         if (picked[current_vertex]) {
             continue;
         }
-        std::cout << "norm lis " << current_vertex << "-" << value[current_vertex].second << " " << current_value << std::endl;
         if (current_vertex != value[current_vertex].second) {
             dad[current_vertex] = value[current_vertex].second;
             degrees[current_vertex]++;
@@ -228,7 +221,6 @@ one_tree prim_onetree_edges(std::vector<std::vector<float>>& p, std::vector<floa
             }
         }
     }
-    std::cout << "norm vika " << best_i << "-" << best_j << " " << second_longest << std::endl;
     length += second_longest;
     degrees[best_i]++;
     degrees[best_j]++;

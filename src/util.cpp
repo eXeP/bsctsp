@@ -9,13 +9,18 @@ std::vector<std::vector<float>> read_graph(char* tsp_name) {
     std::ifstream tsp_file(tsp_file_name);
     std::string sink;
     int dimension;
-    std::getline(tsp_file, sink);
-    std::getline(tsp_file, sink);
-    std::getline(tsp_file, sink);
-    tsp_file >> sink >> sink >> dimension;
-    std::getline(tsp_file, sink);
-    std::getline(tsp_file, sink);
-    std::getline(tsp_file, sink);
+    while(true) {
+        std::getline(tsp_file, sink);
+        if (sink.find("DIMENSION") != std::string::npos) {
+            dimension = std::stoi(sink.substr(sink.find(":")+1));
+            break;
+        }
+    }
+    while(true) {
+        std::getline(tsp_file, sink);
+        if (sink.find("NODE_COORD_SECTION") != std::string::npos)
+            break;
+    }
 
     std::vector<std::vector<float>> coords;
     for (int i = 0; i < 2; ++i)

@@ -165,37 +165,45 @@ __global__ void id_map_calculate(int* id, int* id_map) {
 
 __global__ void two_opt_kernel_restricted(const float* x, const float* y, const int* moves, const int* id, const int* id_map, best_struct* return_best, int n, const int allowed_moves, int* lock) {
     int i = blockIdx.x;
-    const int* i_moves = moves + i * allowed_moves;
     float best = 0;
     int best_j = 0;
     if (i > 0) {
+        int id_i = id[i];
+        int id_i_prev = id[i-1];
+        const int* i_prev_moves = moves + id_i_prev * allowed_moves;
+        const int* i_moves = moves + id_i * allowed_moves;
+        
         float xi = x[i], xim = x[i-1], yi = y[i], yim = y[i-1];
         float i_dist = dist(xi, yi, xim, yim);
-        int id_i = id[i];
         for (int k = 0; k < allowed_moves; ++k) {
-            int id_j = i_moves[k];
+            int id_j = i_prev_moves[k];
             int j = id_map[id_j];
             if (j != 0 && j != n-1) {
-                float k_dist = i_dist + dist(x[j], y[j], x[j+1], y[j+1]) - 
-                (dist(xi, yi, x[j+1], y[j+1]) + dist(xim, yim, x[j], y[j]));
-                if (k_dist > best) {
-                    best = k_dist;
-                    best_j = j+k;
+                int jp = id_map[j+1];
+                for (int k2 = 0; k2 < allowed_moves; ++k2) {
+                    int id_jp = i_moves[k2];
+                    if (jp == id_jp) {
+                        float k_dist = i_dist + dist(x[j], y[j], x[j+1], y[j+1]) - 
+                        (dist(xi, yi, x[j+1], y[j+1]) + dist(xim, yim, x[j], y[j]));
+                        printf("sis %d %d %f\n", i, j, k_dist);
+                        if (k_dist > best) {
+                            best = k_dist;
+                            best_j = j+k;
+                        }
+                    }
                 }
             }
         }
     }
 
-    __syncthreads();
     if (best > return_best[0].best) {
-        while (atomicExch(&lock[0], 1) != 0);
+        while (atomicExch(&lock[0], 1) != 0 && best > return_best[0].best);
         if (best > return_best[0].best) {
             return_best[0].best = best;
             return_best[0].i = i;
             return_best[0].j = best_j;
         }
         lock[0] = 0;
-        __threadfence();
     }
 }
 
@@ -236,23 +244,33 @@ void run_gpu_2opt_restricted(float* x, float* y, int* id, int* moves, int n, int
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
         cudaMemset(lock, 0, 1*sizeof(int));
+        printf("tasa4\n");
+        fflush(stdout);
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
         two_opt_kernel_restricted<<<dimGrid, dimBlock>>>(xGPU, yGPU, Gmoves, Gid, Gid_map, bestGPU, n, allowed_moves, lock);
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
+        printf("tasa3\n");
+        fflush(stdout);
         best_struct* best = (best_struct*)malloc(sizeof(best_struct));
         cudaMemcpy(best, bestGPU, sizeof(best_struct), cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize();
+        printf("Improvement %f %d %d\n", best[0].best, best[0].i, best[0].j);
+        fflush(stdout);
         if (abs(best[0].best) < 0.000001)
             break;
-        //printf("Improvement %f %d %d\n", best[0].best, best[0].i, best[0].j);
+        
         two_opt_swap_kernel_id<<<dim3((best[0].j-best[0].i+1)/2, 1), dim3(1, 1)>>>(xGPU, yGPU, Gid, best[0].i, best[0].j);
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
+        printf("tasa5\n");
+        fflush(stdout);
         id_map_calculate<<<dim3(n, 1), dim3(1, 1)>>>(Gid, Gid_map);
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
+        printf("tasa6\n");
+        fflush(stdout);
     } while(true);
 
     cudaMemcpy(x, xGPU, n * sizeof(float), cudaMemcpyDeviceToHost);
