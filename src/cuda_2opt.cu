@@ -185,7 +185,7 @@ __global__ void two_opt_kernel_restricted(const float* x, const float* y, const 
                     if (jp == id_jp) {
                         float k_dist = i_dist + dist(x[j], y[j], x[j+1], y[j+1]) - 
                         (dist(xi, yi, x[j+1], y[j+1]) + dist(xim, yim, x[j], y[j]));
-                        printf("sis %d %d %f\n", i, j, k_dist);
+                        //printf("sis %d %d %f\n", i, j, k_dist);
                         if (k_dist > best) {
                             best = k_dist;
                             best_j = j+k;
@@ -244,15 +244,11 @@ void run_gpu_2opt_restricted(float* x, float* y, int* id, int* moves, int n, int
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
         cudaMemset(lock, 0, 1*sizeof(int));
-        printf("tasa4\n");
-        fflush(stdout);
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
         two_opt_kernel_restricted<<<dimGrid, dimBlock>>>(xGPU, yGPU, Gmoves, Gid, Gid_map, bestGPU, n, allowed_moves, lock);
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
-        printf("tasa3\n");
-        fflush(stdout);
         best_struct* best = (best_struct*)malloc(sizeof(best_struct));
         cudaMemcpy(best, bestGPU, sizeof(best_struct), cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize();
@@ -264,13 +260,9 @@ void run_gpu_2opt_restricted(float* x, float* y, int* id, int* moves, int n, int
         two_opt_swap_kernel_id<<<dim3((best[0].j-best[0].i+1)/2, 1), dim3(1, 1)>>>(xGPU, yGPU, Gid, best[0].i, best[0].j);
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
-        printf("tasa5\n");
-        fflush(stdout);
         id_map_calculate<<<dim3(n, 1), dim3(1, 1)>>>(Gid, Gid_map);
         CHECK(cudaGetLastError());
         cudaDeviceSynchronize();
-        printf("tasa6\n");
-        fflush(stdout);
     } while(true);
 
     cudaMemcpy(x, xGPU, n * sizeof(float), cudaMemcpyDeviceToHost);

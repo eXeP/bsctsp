@@ -29,6 +29,15 @@ static inline std::vector<std::vector<float>> random_graph(int n) {
     return p;
 }
 
+static inline int tour_cost(std::vector<std::vector<float>>& coords) {
+    int n = coords[0].size();
+    float c = 0;
+    for (int i = 0; i < n; ++i) {
+        c += sqrdistance(coords, i, (i+1)%n);
+    }
+    return c;
+}
+
 static inline float distance(std::vector<std::vector<float>>& coords, int i, int j) {
     float d = 0;
     for (int k = 0; k < coords.size(); ++k) {

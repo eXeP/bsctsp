@@ -319,6 +319,8 @@ std::vector<float> gpu_subgradient_opt_alpha(float* x, float* y, int n) {
             cudaDeviceSynchronize();
             last_v = v;
             auto [w, d] = gpu_boruvka_onetree(n, Gx, Gy, Gpi);
+            for (int i = 0; i < n; ++i)
+                w -= 2 * pi[i];
             is_tour = true;
             for (int i = 0; i < n; ++i) {
                 v[i] = d[i] - 2;
