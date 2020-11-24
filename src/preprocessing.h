@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <unordered_set>
 
 struct one_tree {
     float length;
@@ -9,6 +10,7 @@ struct one_tree {
     std::vector<int> topo;
     std::vector<float> next_best;
     int first_node;
+    int special_node;
 };
 
 std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>& coords, std::vector<float>& pi, one_tree& onetree);

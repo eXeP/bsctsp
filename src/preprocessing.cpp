@@ -6,22 +6,22 @@
 #include <limits>
 #include <math.h> 
 #include <algorithm> 
+#include <unordered_set>
 #include "util.h"
 
 
 std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>& coords, std::vector<float>& pi, one_tree& onetree) {
     int n = coords[0].size();
     std::vector<std::vector<float>> alpha = std::vector<std::vector<float>>(n, std::vector<float>(n, 0));
-    std::vector<int> mark = std::vector<int>(n, 0);
+    std::vector<int> mark = std::vector<int>(n, -1);
     std::vector<float> b = std::vector<float>(n);
     for (int i = 0; i < n; ++i) {
         int from = onetree.topo[i];
         int to = 0;
+        b[from] = -std::numeric_limits<float>::max()/2.f;
         if (from != onetree.first_node) {
-            b[from] = -std::numeric_limits<float>::max()/2.f;
-            for (int k = from; k != onetree.first_node; k = to) {
-                to = onetree.dad[k];
-                b[to] = std::max(b[k], d_ij(coords, pi, k, to));
+            for (int to = from; to != onetree.first_node; to = onetree.dad[to]) {
+                b[onetree.dad[to]] = std::max(b[to], d_ij(coords, pi, to, onetree.dad[to]));
                 mark[to] = from;
             }
         }
@@ -29,15 +29,15 @@ std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>&
             to = onetree.topo[j];
             if (to == from)
                 continue;
-            if (from == onetree.first_node) {
-                alpha[from][to] = (to == onetree.dad[from]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[from];
-            } else if (to == onetree.first_node) {
-                alpha[from][to] = (from == onetree.dad[to]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[to];
+            if (from == onetree.special_node) {
+                alpha[from][to] = (d_ij(coords, pi, from, to) <=  onetree.next_best[from]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[from];
+            } else if (to == onetree.special_node) {
+                alpha[from][to] = (d_ij(coords, pi, from, to) <=  onetree.next_best[to]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[to];
             } else {
                 if (mark[to] != from) {
                     b[to] = std::max(b[onetree.dad[to]], d_ij(coords, pi, to, onetree.dad[to]));
                 }
-                alpha[from][to] = d_ij(coords, pi, to, from) - b[to];
+                alpha[from][to] = std::max(d_ij(coords, pi, to, from) - b[to], 0.f);
             }
         }
     }
@@ -106,8 +106,8 @@ one_tree prim_onetree_edges(std::vector<std::vector<float>>& p, std::vector<floa
                     lens.push_back({c(i, j), j});
             }
             std::sort(lens.begin(), lens.end());
-            next_best[i] = second_longest;
-            if (lens[1].first < second_longest) {
+            next_best[i] = lens[1].first;
+            if (lens[1].first > second_longest) {
                 best_i = i;
                 best_j = lens[1].second;
                 second_longest = lens[1].first;
@@ -125,6 +125,7 @@ one_tree prim_onetree_edges(std::vector<std::vector<float>>& p, std::vector<floa
     onetree.dad = dad;
     onetree.topo = topo;
     onetree.first_node = start_vertex;
+    onetree.special_node = best_i;
     onetree.next_best = next_best;
 
     return onetree;
