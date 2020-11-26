@@ -26,7 +26,7 @@ std::vector<std::vector<float>> read_graph(char* tsp_name) {
     for (int i = 0; i < 2; ++i)
         coords.push_back(std::vector<float>());
     for (int i = 0; i < dimension; ++i) {
-        int id, x, y;
+        float id, x, y;
         tsp_file >> id >> x >> y;
         coords[0].push_back(x);
         coords[1].push_back(y);

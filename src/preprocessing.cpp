@@ -37,11 +37,62 @@ std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>&
                 if (mark[to] != from) {
                     b[to] = std::max(b[onetree.dad[to]], d_ij(coords, pi, to, onetree.dad[to]));
                 }
+                //max for numerical errors.
                 alpha[from][to] = std::max(d_ij(coords, pi, to, from) - b[to], 0.f);
             }
         }
     }
     return alpha;
+}
+
+std::vector<std::vector<std::pair<float, int>>> candidate_generation_alpha(std::vector<std::vector<float>>& coords, std::vector<float>& pi, one_tree& onetree, const int MAX_EDGES) {
+    int n = coords[0].size();
+    std::vector<std::vector<std::pair<std::pair<float, float>, int>>> alpha(n);
+    std::vector<int> mark = std::vector<int>(n, -1);
+    std::vector<float> b = std::vector<float>(n);
+
+    auto add_alpha = [&alpha, MAX_EDGES, &coords](int i, int j, float value) {
+        alpha[i].push_back({{value, distance(coords, i, j)}, j});
+        std::sort(alpha[i].begin(), alpha[i].end());
+        if (alpha[i].size() > MAX_EDGES)
+            alpha[i].pop_back();
+    };
+
+    for (int i = 0; i < n; ++i) {
+        int from = onetree.topo[i];
+        int to = 0;
+        b[from] = -std::numeric_limits<float>::max()/2.f;
+        if (from != onetree.first_node) {
+            for (int to = from; to != onetree.first_node; to = onetree.dad[to]) {
+                b[onetree.dad[to]] = std::max(b[to], d_ij(coords, pi, to, onetree.dad[to]));
+                mark[to] = from;
+            }
+        }
+        for (int j = 0; j < n; ++j) {
+            to = onetree.topo[j];
+            if (to == from)
+                continue;
+            if (from == onetree.special_node) {
+                add_alpha(from, to, (d_ij(coords, pi, from, to) <=  onetree.next_best[from]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[from]);
+            } else if (to == onetree.special_node) {
+                add_alpha(from, to, (d_ij(coords, pi, from, to) <=  onetree.next_best[to]) ? 0.f : d_ij(coords, pi, from, to) - onetree.next_best[to]);
+            } else {
+                if (mark[to] != from) {
+                    b[to] = std::max(b[onetree.dad[to]], d_ij(coords, pi, to, onetree.dad[to]));
+                }
+                //max for numerical errors.
+                add_alpha(from, to, std::max(d_ij(coords, pi, to, from) - b[to], 0.f));
+            }
+        }
+    }
+
+    std::vector<std::vector<std::pair<float, int>>> ret(n);
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < MAX_EDGES; ++j) {
+            ret[i].push_back({alpha[i][j].first.first, alpha[i][j].second});
+        }
+    }
+    return ret;
 }
 
 

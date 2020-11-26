@@ -15,6 +15,7 @@ struct one_tree {
 
 std::vector<std::vector<float>> calculate_alpha(std::vector<std::vector<float>>& coords, std::vector<float>& pi, one_tree& onetree);
 std::vector<std::vector<float>> calculate_exact_alpha(std::vector<std::vector<float>>& coords, std::vector<float>& pi);
+std::vector<std::vector<std::pair<float, int>>> candidate_generation_alpha(std::vector<std::vector<float>>& coords, std::vector<float>& pi, one_tree& onetree, const int MAX_EDGES);
 
 one_tree prim_onetree_edges(std::vector<std::vector<float>>& p, std::vector<float>& pi);
 
