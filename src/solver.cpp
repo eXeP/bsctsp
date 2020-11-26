@@ -96,9 +96,14 @@ std::pair<std::vector<std::vector<float>>, std::vector<int>> initial_tour_alpha(
                 break;
             }
         }
+        std::vector<std::pair<float, int>> closest;
         for (int j = 0; j < n; ++j) {
-            if (!picked[j]) {
-                pick_vertex(j);
+            closest.push_back({distance(coords, initial_id.back(), j), j});
+        }
+        sort(closest.begin(), closest.end());
+        for (int j = 0; j < n; ++j) {
+            if (!picked[closest[j].second]) {
+                pick_vertex(closest[j].second);
                 break;
             }
         }
