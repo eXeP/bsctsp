@@ -16,8 +16,8 @@ instancesG = ["eil101", "a280", "att532", "pr1002", "d1291", "d1655", "d2103", "
 instancesC = ["eil101", "a280", "att532", "pr1002", "d1291", "d1655", "d2103", "pcb3038"]
 devices = ["GPU", "CPU"]
 
-def run_rand(instance):
-    out = run_and_get_input("./solver " + instance + " RAND GPU")
+def run_rand(instance, device):
+    out = run_and_get_input("./solver " + instance + " RAND " + device)
     outs = out.split(" ")
     result = outs[3]
     time = outs[1]
@@ -38,12 +38,12 @@ with open('results_cpu.csv', 'w', newline='') as res_gpu, open('err_cpu.cpu', 'w
     err_writer.writerow(["Instance", "RAND result", "A1 error", "A2 error", "A3 error"])
     time_writer.writerow(["Instance", "RAND time", "A1 time1", "A1 time2", "A2 time1", "A2 time2", "A3 time1", "A3 time2"])
     time2_writer.writerow(["Instance", "RAND time", "A1 time", "A2 time", "A3 time"])
-    for i in range(0, len(instancesG)):
-        instance = instancesG[i]
-        RAND_res, RAND_time = run_rand(instance)
-        A1_res, A1_t1, A1_t2 = run_alpha(instance, "ALPHA1", devices[0])
-        A2_res, A2_t1, A2_t2 = run_alpha(instance, "ALPHA2", devices[0])
-        A3_res, A3_t1, A3_t2 = run_alpha(instance, "ALPHA3", devices[0])
+    for i in range(0, len(instancesC)):
+        instance = instancesC[i]
+        RAND_res, RAND_time = run_rand(instance, "CPU")
+        A1_res, A1_t1, A1_t2 = run_alpha(instance, "ALPHA1", devices[1])
+        A2_res, A2_t1, A2_t2 = run_alpha(instance, "ALPHA2", devices[1])
+        A3_res, A3_t1, A3_t2 = run_alpha(instance, "ALPHA3", devices[1])
         res_writer.writerow([instance, RAND_res, A1_res, A2_res, A3_res, opt[i]])
         err_writer.writerow([instance, str(round((RAND_res-opt[i])/opt[i]*100, 1)), str(round((A1_res-opt[i])/opt[i]*100, 1)), str(round((A2_res-opt[i])/opt[i]*100, 1)), str(round((A3_res-opt[i])/opt[i]*100, 1))])
         time_writer.writerow([instance, RAND_time, A1_t1, A1_t2, A2_t1, A2_t2, A3_t1, A3_t2])

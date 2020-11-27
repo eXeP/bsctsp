@@ -264,14 +264,42 @@ void solve_instance_gpu_random(std::vector<std::vector<float>> coords) {
     std::cout << "result: " << best << std::endl; 
 }
 
+void solve_instance_cpu_random(std::vector<std::vector<float>> coords) {
+    int permutations = 100;
+    int n = coords[0].size();
+    float best = std::numeric_limits<float>::max();
+    std::vector<std::vector<float>> best_coords;
+    Timer timer;
+    timer.start();
+    while(permutations--) {
+        shuffle(coords);
+        auto [x, y] = two_opt_best(coords[0], coords[1]);
+        coords[0] = x;
+        coords[1] = y;
+        float new_tour_cost = tour_cost(coords);
+        if (new_tour_cost < best) {
+            best = new_tour_cost;
+            best_coords = coords;
+        }
+    }
+    timer.stop();
+    std::cout << "2-opt: " << timer.elapsedMilliseconds() << std::endl;
+    std::cout << "result: " << best << std::endl; 
+}
+
 int main(int argc, char** argv) {
     std::cout << std::setprecision(10);
     std::srand(time(nullptr));
 
     auto p = read_graph(argv[1]);
     std::string algo(argv[2]);
+    std::string device(argv[3]);
     if (algo.compare("RAND") == 0) {
-        solve_instance_gpu_random(p);
+        if (device.compare("GPU") == 0) {
+            solve_instance_gpu_random(p);
+        } else if (device.compare("CPU") == 0){
+            solve_instance_cpu_random(p);
+        }
     } else {
         std::string device(argv[3]);
         auto candidates = std::stoi(argv[4]);
