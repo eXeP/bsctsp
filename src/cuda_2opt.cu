@@ -17,9 +17,7 @@ struct best_struct {
 __global__ void two_opt_kernel(const float* x, const float* y, best_struct* return_best, int n, int* lock) {
     int i = threadIdx.x + blockIdx.x * blockDim.x+1;
     int j = blockIdx.y * blockDim.x;
-    __shared__ float shared_x[65];
-    __shared__ float shared_y[65];
-    __shared__ float shared_best[64];
+    __shared__ float shared_x[65], shared_y[65], shared_best[64];
     __shared__ int shared_j[64];
     shared_best[threadIdx.x] = 0;
     shared_j[threadIdx.x] = 0;

@@ -214,7 +214,6 @@ void solve_instance_cpu_alpha(std::vector<std::vector<float>> coords, const int 
     auto allowed = calculate_allowed_alpha(candidate_set);
     timer.stop();
     std::cout << "preprocessing: " << timer.elapsedMilliseconds() << std::endl;
-
     Timer timer2;
     timer2.start();
     std::vector<int> id(n);
@@ -292,6 +291,7 @@ int main(int argc, char** argv) {
     std::srand(time(nullptr));
 
     auto p = read_graph(argv[1]);
+
     std::string algo(argv[2]);
     std::string device(argv[3]);
     if (algo.compare("RAND") == 0) {

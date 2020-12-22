@@ -40,10 +40,10 @@ with open('results_cpu.csv', 'w', newline='') as res_gpu, open('err_cpu.cpu', 'w
     time2_writer.writerow(["Instance", "RAND time", "A1 time", "A2 time", "A3 time"])
     for i in range(0, len(instancesC)):
         instance = instancesC[i]
-        RAND_res, RAND_time = run_rand(instance, "CPU")
-        A1_res, A1_t1, A1_t2 = run_alpha(instance, "ALPHA1", devices[1])
+        RAND_res, RAND_time = (0, 0)
+        A1_res, A1_t1, A1_t2 = (0, 0, 0)
         A2_res, A2_t1, A2_t2 = run_alpha(instance, "ALPHA2", devices[1])
-        A3_res, A3_t1, A3_t2 = run_alpha(instance, "ALPHA3", devices[1])
+        A3_res, A3_t1, A3_t2 = (0, 0, 0)
         res_writer.writerow([instance, RAND_res, A1_res, A2_res, A3_res, opt[i]])
         err_writer.writerow([instance, str(round((RAND_res-opt[i])/opt[i]*100, 1)), str(round((A1_res-opt[i])/opt[i]*100, 1)), str(round((A2_res-opt[i])/opt[i]*100, 1)), str(round((A3_res-opt[i])/opt[i]*100, 1))])
         time_writer.writerow([instance, RAND_time, A1_t1, A1_t2, A2_t1, A2_t2, A3_t1, A3_t2])

@@ -318,7 +318,7 @@ std::vector<float> gpu_subgradient_opt_alpha(float* x, float* y, int n) {
         is_tour &= (last_v[i] == 0);
     }
     bool initial_phase = true;
-    int initial_period = max(n/2, 100);
+    int initial_period = 1000;
     int period = initial_period;
     for (float t = 1.f; t > 0; t /= 2.f, period /= 2) {
         for (int p = 1; t > 0 && p <= period; ++p) {
